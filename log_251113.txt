@@ -1,0 +1,63 @@
+ubuntu@instance-20251103-1547:~$ docker run -d \
+  --name postgres \
+  -e POSTGRES_USER=airflow \
+  -e POSTGRES_PASSWORD=airflow \
+  -e POSTGRES_DB=airflow_meta \
+  -p 5432:5432 \
+  -v ~/pgdata:/var/lib/postgresql/data \
+  postgres:16
+Unable to find image 'postgres:16' locally
+16: Pulling from library/postgres
+d7ecded7702a: Already exists
+e07a799c53b4: Pull complete
+31396154f97e: Pull complete
+bb0c101900e8: Pull complete
+06b5c9b14922: Pull complete
+cdb0b4a7bc6e: Pull complete
+5833aa2e911a: Pull complete
+41c508b3d5ce: Pull complete
+9b4b5d8be9ad: Pull complete
+bfe4361f6d87: Pull complete
+c0f2b25a983f: Pull complete
+fc3188bd5366: Pull complete
+e836c184e52a: Pull complete
+df933810a063: Pull complete
+Digest: sha256:21f6013073bc6b92830a2129570e2f5ec42a6c734b5a985a41e83aa58f54c3c1
+Status: Downloaded newer image for postgres:16
+2c6fd798a57ef06bec54ff5155a8e7f0e4dcb368ab557dab244ab36c79d5d12f
+ubuntu@instance-20251103-1547:~$ ^C
+ubuntu@instance-20251103-1547:~$ docker ps
+CONTAINER ID   IMAGE                   COMMAND                  CREATED          STATUS                  PORTS                                         NAMES
+2c6fd798a57e   postgres:16             "docker-entrypoint.s…"   48 seconds ago   Up 42 seconds           0.0.0.0:5432->5432/tcp, [::]:5432->5432/tcp   postgres
+4e21a3d1b8cc   apache/airflow:2.10.3   "/usr/bin/dumb-init …"   10 hours ago     Up 10 hours             0.0.0.0:8080->8080/tcp, [::]:8080->8080/tcp   airflow-airflow-1
+91935314e198   postgres:15             "docker-entrypoint.s…"   10 hours ago     Up 10 hours (healthy)   5432/tcp                                      airflow-postgres-1
+ubuntu@instance-20251103-1547:~$ ^C
+ubuntu@instance-20251103-1547:~$ docker exec -it postgres psql -U airflow -d airflow_meta
+psql (16.10 (Debian 16.10-1.pgdg13+1))
+Type "help" for help.
+
+airflow_meta=# ^C
+airflow_meta=# exit
+ubuntu@instance-20251103-1547:~$ docker exec -it postgres psql -U airflow -d airflow_meta
+psql (16.10 (Debian 16.10-1.pgdg13+1))
+Type "help" for help.
+
+airflow_meta=# ALTER DATABASE airflow_meta RANAME TO kopis_dw;
+ERROR:  syntax error at or near "TO"
+LINE 1: ALTER DATABASE airflow_meta RANAME TO kopis_dw;
+                                           ^
+airflow_meta=# ALTER DATABASE airflow_meta RENAME TO kopis_dw;
+ERROR:  current database cannot be renamed
+airflow_meta=# exit
+ubuntu@instance-20251103-1547:~$ ^[[200~docker exec -it postgres psql -U airflow -d postgres -c "ALTER DATABASE airflow_meta RENAME TO kopis_dw;"
+docker: command not found
+ubuntu@instance-20251103-1547:~$ docker exec -it postgres psql -U airflow -d postgres -c "ALTER DATABASE airflow_meta RENAME TO kopis_dw;"
+ALTER DATABASE
+ubuntu@instance-20251103-1547:~$ docker ps
+CONTAINER ID   IMAGE                   COMMAND                  CREATED         STATUS                  PORTS                                         NAMES
+2c6fd798a57e   postgres:16             "docker-entrypoint.s…"   5 minutes ago   Up 5 minutes            0.0.0.0:5432->5432/tcp, [::]:5432->5432/tcp   postgres
+4e21a3d1b8cc   apache/airflow:2.10.3   "/usr/bin/dumb-init …"   10 hours ago    Up 10 hours             0.0.0.0:8080->8080/tcp, [::]:8080->8080/tcp   airflow-airflow-1
+91935314e198   postgres:15             "docker-entrypoint.s…"   10 hours ago    Up 10 hours (healthy)   5432/tcp                                      airflow-postgres-1
+ubuntu@instance-20251103-1547:~$ ^C
+ubuntu@instance-20251103-1547:~$ ^C
+ubuntu@instance-20251103-1547:~$
