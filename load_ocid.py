@@ -1,6 +1,6 @@
 import requests
 import pandas as pd
-from config import API_KEY
+from config import API_KEY, DATE
 import time
 
 headers = {
@@ -26,12 +26,12 @@ def get_character_ocid(character_name):
     except Exception as e:
         print(f"OCID 조회 오류 - {character_name}: {e}")
         return None
-def create_user_ocid_table(date="2025-01-05"):
+def create_user_ocid_table(date=DATE):
     """
     도장 랭킹 CSV에서 캐릭터 이름을 읽어와서 유저 마스터 테이블 생성 (상위 100명)
     """
     # 랭킹 CSV 파일 읽기
-    ranking_file = f"dojang_ranking_{date.replace('-', '')}.csv"
+    ranking_file = f"data/dojang_ranking_{date}.csv"
     
     try:
         df_ranking = pd.read_csv(ranking_file, encoding='utf-8-sig')
@@ -65,7 +65,7 @@ def create_user_ocid_table(date="2025-01-05"):
     # DataFrame 생성 및 CSV 저장
     if user_ocid_list:
         df_ocid = pd.DataFrame(user_ocid_list)
-        output_file = f"user_ocid_{date.replace('-', '')}.csv"
+        output_file = f"data/user_ocid_{date}.csv"
         df_ocid.to_csv(output_file, index=False, encoding='utf-8-sig')
         print(f"\n유저 마스터 테이블 저장 완료: {output_file}")
         print(f"총 {len(df_ocid)}명의 유저 정보 수집")
@@ -76,5 +76,5 @@ def create_user_ocid_table(date="2025-01-05"):
 
 # 실행
 if __name__ == "__main__":
-    date = "2025-01-05"
+    date = DATE
     create_user_ocid_table(date)
