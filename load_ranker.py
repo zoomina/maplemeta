@@ -1,6 +1,6 @@
 import requests, datetime
 import pandas as pd
-from config import API_KEY
+from config import API_KEY, DATE
 
 headers = {
 "x-nxopen-api-key": API_KEY
@@ -36,6 +36,8 @@ def create_dojang_table(json_data):
     df_korean['기록시간(분:초)'] = df_korean['기록시간(초)'].apply(
         lambda x: f"{x//60}:{x%60:02d}"
     )
+
+    df_korean.to_csv(f"data/dojang_ranking_{DATE}.csv", index=False, encoding='utf-8')
     
     return df_korean
 
@@ -51,7 +53,7 @@ def display_table(df):
         print("테이블 생성 실패")
 
 # API 호출
-date = "2025-12-31"
+date = DATE
 dojang_url = "https://open.api.nexon.com/maplestory/v1/ranking/dojang?date=" + date + "&world_name=%EB%A3%A8%EB%82%98&difficulty=1"
 dojang_rank = requests.get(dojang_url, headers = headers)
 

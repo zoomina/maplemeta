@@ -2,7 +2,7 @@ import requests
 import pandas as pd
 import json
 import time
-from config import API_KEY
+from config import API_KEY, DATE
 
 headers = {
     "x-nxopen-api-key": API_KEY
@@ -102,12 +102,12 @@ def process_endpoint_data(df_master, date, endpoint_name, endpoint_url):
     
     return pd.DataFrame(all_data) if all_data else None
 
-def load_character_info_by_endpoint(date="2025-01-05"):
+def load_character_info_by_endpoint(date=DATE):
     """
     엔드포인트별로 캐릭터 정보를 수집하여 개별 CSV 파일로 저장
     """
     # 유저 마스터 테이블 읽기
-    master_file = f"user_master_{date.replace('-', '')}.csv"
+    master_file = f"data/user_ocid_{date}.csv"
     
     try:
         df_master = pd.read_csv(master_file, encoding='utf-8-sig')
@@ -129,7 +129,6 @@ def load_character_info_by_endpoint(date="2025-01-05"):
     }
     
     created_files = []
-    date_str = date.replace('-', '')
     
     # 각 엔드포인트별로 데이터 수집 및 파일 생성
     for endpoint_name, endpoint_url in endpoints.items():
@@ -138,7 +137,7 @@ def load_character_info_by_endpoint(date="2025-01-05"):
         df_endpoint = process_endpoint_data(df_master, date, endpoint_name, endpoint_url)
         
         if df_endpoint is not None and not df_endpoint.empty:
-            output_file = f"character_{endpoint_name}_{date_str}.csv"
+            output_file = f"data/character_{endpoint_name}_{date}.csv"
             df_endpoint.to_csv(output_file, index=False, encoding='utf-8-sig')
             print(f"{endpoint_name} 데이터 저장 완료: {output_file} ({len(df_endpoint)}행)")
             created_files.append(output_file)
@@ -153,5 +152,5 @@ def load_character_info_by_endpoint(date="2025-01-05"):
 
 # 실행
 if __name__ == "__main__":
-    date = "2025-01-05"
+    date = DATE
     load_character_info_by_endpoint(date)
