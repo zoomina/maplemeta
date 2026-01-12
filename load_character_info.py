@@ -45,84 +45,108 @@ def flatten_json_data(data, prefix=""):
                 flattened[new_key] = value
     
     return flattened
-def process_endpoint_data(df_master, date, endpoint_name, endpoint_url):
+def process_endpoint_data(master_data, date, endpoint_name, endpoint_url):
     """
-    특정 엔드포인트의 데이터를 처리하여 DataFrame 생성
+    특정 엔드포인트의 데이터를 처리하여 리스트 생성
     """
     all_data = []
+    failed_list = []
+    consecutive_errors = 0
+    max_consecutive_errors = 5
     
-    for idx, row in df_master.iterrows():
-        ocid = row['ocid']
-        character_name = row['character_name']
+    for idx, user in enumerate(master_data):
+        ocid = user['ocid']
+        character_name = user['character_name']
         
-        print(f"[{endpoint_name}] 처리 중... ({idx+1}/{len(df_master)}) {character_name}")
+        print(f"[{endpoint_name}] 처리 중... ({idx+1}/{len(master_data)}) {character_name}")
         
         data = get_character_data(ocid, date, endpoint_url)
         
         if data:
-            # 리스트 형태의 데이터가 있는지 확인
-            list_fields = []
-            base_data = {'ocid': ocid, 'character_name': character_name}
+            # 기본 정보 추가
+            data['ocid'] = ocid
+            data['character_name'] = character_name
+            all_data.append(data)
+            consecutive_errors = 0  # 성공시 연속 에러 카운트 리셋
+        else:
+            print(f"[{endpoint_name}] 조회 실패: {character_name}")
+            failed_list.append({'index': idx, 'ocid': ocid, 'character_name': character_name})
+            consecutive_errors += 1
             
-            for key, value in data.items():
-                if isinstance(value, list) and len(value) > 0:
-                    # 리스트의 첫 번째 요소가 dict인 경우 확장 필요
-                    if isinstance(value[0], dict):
-                        list_fields.append((key, value))
-                    else:
-                        base_data[key] = json.dumps(value, ensure_ascii=False)
-                else:
-                    if isinstance(value, dict):
-                        flattened = flatten_json_data(value, key)
-                        base_data.update(flattened)
-                    else:
-                        base_data[key] = value
-            
-            # 리스트 데이터가 있는 경우 각각을 별도 행으로 확장
-            if list_fields:
-                for field_name, field_data in list_fields:
-                    for i, item in enumerate(field_data):
-                        row_data = base_data.copy()
-                        row_data['list_field'] = field_name
-                        row_data['list_index'] = i
-                        
-                        if isinstance(item, dict):
-                            flattened_item = flatten_json_data(item, field_name)
-                            row_data.update(flattened_item)
-                        else:
-                            row_data[f"{field_name}_value"] = item
-                        
-                        all_data.append(row_data)
-            else:
-                # 리스트 데이터가 없는 경우 단일 행으로 추가
-                all_data.append(base_data)
+            # 연속 에러가 5건 이상이면 중단
+            if consecutive_errors >= max_consecutive_errors:
+                print(f"\n[{endpoint_name}] 연속 {max_consecutive_errors}건 에러 발생. 조회를 중단합니다.")
+                # 진행상황 저장
+                progress_file = f"data_json/{endpoint_name}_progress_{date}.json"
+                with open(progress_file, 'w', encoding='utf-8') as f:
+                    json.dump({
+                        'endpoint': endpoint_name,
+                        'last_processed_index': idx,
+                        'total_count': len(master_data),
+                        'success_count': len(all_data),
+                        'failed_count': len(failed_list),
+                        'failed_list': failed_list
+                    }, f, ensure_ascii=False, indent=2)
+                print(f"[{endpoint_name}] 진행상황 저장: {progress_file}")
+                break
         
         # API 호출 제한 방지 (초당 5건)
         time.sleep(0.3)
     
-    return pd.DataFrame(all_data) if all_data else None
+    # 실패한 항목들 재시도
+    if failed_list and consecutive_errors < max_consecutive_errors:
+        print(f"\n[{endpoint_name}] 실패한 {len(failed_list)}건 재시도 중...")
+        retry_failed = []
+        
+        for failed_item in failed_list:
+            ocid = failed_item['ocid']
+            character_name = failed_item['character_name']
+            print(f"[{endpoint_name}] 재시도: {character_name}")
+            
+            data = get_character_data(ocid, date, endpoint_url)
+            if data:
+                data['ocid'] = ocid
+                data['character_name'] = character_name
+                all_data.append(data)
+                print(f"[{endpoint_name}] 재시도 성공: {character_name}")
+            else:
+                retry_failed.append(failed_item)
+                print(f"[{endpoint_name}] 재시도 실패: {character_name}")
+            
+            time.sleep(0.3)
+        
+        # 최종 실패 목록 업데이트
+        failed_list = retry_failed
+        
+        # 최종 실패 목록이 있으면 저장
+        if failed_list:
+            failed_file = f"data_json/{endpoint_name}_failed_{date}.json"
+            with open(failed_file, 'w', encoding='utf-8') as f:
+                json.dump(failed_list, f, ensure_ascii=False, indent=2)
+            print(f"[{endpoint_name}] 실패 목록 저장: {failed_file} ({len(failed_list)}건)")
+    
+    return all_data
 
 def load_character_info_by_endpoint(date=DATE):
     """
-    엔드포인트별로 캐릭터 정보를 수집하여 개별 CSV 파일로 저장
+    엔드포인트별로 캐릭터 정보를 수집하여 개별 JSON 파일로 저장
     """
     # 유저 마스터 테이블 읽기
-    master_file = f"data/user_ocid_{date}.csv"
+    master_file = f"data_json/user_ocid_{date}.json"
     
     try:
-        df_master = pd.read_csv(master_file, encoding='utf-8-sig')
-        print(f"유저 마스터 테이블 로드 완료: {len(df_master)}명")
+        with open(master_file, 'r', encoding='utf-8') as f:
+            master_data = json.load(f)
+        print(f"유저 마스터 테이블 로드 완료: {len(master_data)}명")
     except FileNotFoundError:
         print(f"유저 마스터 파일을 찾을 수 없습니다: {master_file}")
         return None
     
     # API 엔드포인트 정의
     endpoints = {
-        'stat': 'stat',
+        # 'stat': 'stat',
         'equipment': 'item-equipment', 
-        'vmatrix': 'vmatrix',
         'hexamatrix': 'hexamatrix',
-        'symbol': 'symbol-equipment',
         'set_effect': 'set-effect',
         'ability': 'ability',
         'hyper_stat': 'hyper-stat'
@@ -134,12 +158,13 @@ def load_character_info_by_endpoint(date=DATE):
     for endpoint_name, endpoint_url in endpoints.items():
         print(f"\n=== {endpoint_name.upper()} 데이터 수집 시작 ===")
         
-        df_endpoint = process_endpoint_data(df_master, date, endpoint_name, endpoint_url)
+        endpoint_data = process_endpoint_data(master_data, date, endpoint_name, endpoint_url)
         
-        if df_endpoint is not None and not df_endpoint.empty:
-            output_file = f"data/character_{endpoint_name}_{date}.csv"
-            df_endpoint.to_csv(output_file, index=False, encoding='utf-8-sig')
-            print(f"{endpoint_name} 데이터 저장 완료: {output_file} ({len(df_endpoint)}행)")
+        if endpoint_data:
+            output_file = f"data_json/character_{endpoint_name}_{date}.json"
+            with open(output_file, 'w', encoding='utf-8') as f:
+                json.dump(endpoint_data, f, ensure_ascii=False, indent=2)
+            print(f"{endpoint_name} 데이터 저장 완료: {output_file} ({len(endpoint_data)}개)")
             created_files.append(output_file)
         else:
             print(f"{endpoint_name} 데이터 없음")
