@@ -1,0 +1,1162 @@
+[
+  {
+    "character_name": "조용눈",
+    "ocid": "3b42c6b58d1c68f3789965307fc90688efe8d04e6d233bd35cf2fabdeb93fb0d",
+    "sub_job": "렌",
+    "world": "루나",
+    "level": 289,
+    "dojang_floor": 95
+  },
+  {
+    "character_name": "미노",
+    "ocid": "8d38c979ca7645d6581f80f9b90ea79b",
+    "sub_job": "렌",
+    "world": "스카니아",
+    "level": 290,
+    "dojang_floor": 90
+  },
+  {
+    "character_name": "범마렌",
+    "ocid": "f48ac5243ad5b3ca5008e6628fe15061",
+    "sub_job": "렌",
+    "world": "스카니아",
+    "level": 287,
+    "dojang_floor": 88
+  },
+  {
+    "character_name": "토끼춤꾼",
+    "ocid": "d7cca63b2ff7a6fe0ff2228cee86f81a",
+    "sub_job": "렌",
+    "world": "스카니아",
+    "level": 289,
+    "dojang_floor": 84
+  },
+  {
+    "character_name": "코강",
+    "ocid": "dda2f23000f76c4ca1a8bb41aa726a5a",
+    "sub_job": "렌",
+    "world": "스카니아",
+    "level": 287,
+    "dojang_floor": 84
+  },
+  {
+    "character_name": "알멍",
+    "ocid": "51fa97c1bfd2cf8049f60751113b8039efe8d04e6d233bd35cf2fabdeb93fb0d",
+    "sub_job": "렌",
+    "world": "루나",
+    "level": 285,
+    "dojang_floor": 81
+  },
+  {
+    "character_name": "히디",
+    "ocid": "8f479dbe205555895823f11b2bd286ea",
+    "sub_job": "렌",
+    "world": "스카니아",
+    "level": 287,
+    "dojang_floor": 81
+  },
+  {
+    "character_name": "렌밤부",
+    "ocid": "c4a87dc6a7b0ba4be365eded225bbf71efe8d04e6d233bd35cf2fabdeb93fb0d",
+    "sub_job": "렌",
+    "world": "루나",
+    "level": 288,
+    "dojang_floor": 81
+  },
+  {
+    "character_name": "하나사카렌",
+    "ocid": "6fd777909d715e533c164690e800371e",
+    "sub_job": "렌",
+    "world": "스카니아",
+    "level": 288,
+    "dojang_floor": 80
+  },
+  {
+    "character_name": "렌히쎈",
+    "ocid": "b50389cdd253eb2f5864f0368a200ffe",
+    "sub_job": "렌",
+    "world": "스카니아",
+    "level": 285,
+    "dojang_floor": 80
+  },
+  {
+    "character_name": "맹자린",
+    "ocid": "087628bba2d2e60feebb9c2df1d71654",
+    "sub_job": "렌",
+    "world": "스카니아",
+    "level": 285,
+    "dojang_floor": 79
+  },
+  {
+    "character_name": "내맘대러",
+    "ocid": "00b4d2d0fa542fecb280fa4ecba4a903",
+    "sub_job": "렌",
+    "world": "스카니아",
+    "level": 289,
+    "dojang_floor": 79
+  },
+  {
+    "character_name": "찍캠",
+    "ocid": "a2f2510b95a9d3109e1e41702d4d60cc",
+    "sub_job": "렌",
+    "world": "스카니아",
+    "level": 286,
+    "dojang_floor": 79
+  },
+  {
+    "character_name": "까랜",
+    "ocid": "2576ee2c865a7727baa93ce1f5f08de1",
+    "sub_job": "렌",
+    "world": "스카니아",
+    "level": 285,
+    "dojang_floor": 79
+  },
+  {
+    "character_name": "나다싶은사람",
+    "ocid": "5d4bd74dc0b228f5b535d0f846d4854b",
+    "sub_job": "렌",
+    "world": "스카니아",
+    "level": 286,
+    "dojang_floor": 79
+  },
+  {
+    "character_name": "웁핀렌",
+    "ocid": "a7b597e85debb6f277169ea473efc269",
+    "sub_job": "렌",
+    "world": "스카니아",
+    "level": 287,
+    "dojang_floor": 79
+  },
+  {
+    "character_name": "있급",
+    "ocid": "b07a0ca0b28d2bfe9f6890b1df1509dcefe8d04e6d233bd35cf2fabdeb93fb0d",
+    "sub_job": "렌",
+    "world": "루나",
+    "level": 285,
+    "dojang_floor": 79
+  },
+  {
+    "character_name": "꾹속",
+    "ocid": "182f244728831b761032a91ed8c930a1efe8d04e6d233bd35cf2fabdeb93fb0d",
+    "sub_job": "렌",
+    "world": "루나",
+    "level": 287,
+    "dojang_floor": 78
+  },
+  {
+    "character_name": "뚠늬",
+    "ocid": "14b5636af6e4066c84b37e70225f2c40efe8d04e6d233bd35cf2fabdeb93fb0d",
+    "sub_job": "렌",
+    "world": "루나",
+    "level": 285,
+    "dojang_floor": 78
+  },
+  {
+    "character_name": "땡읾",
+    "ocid": "b55f38f25bbc5c0aa18667d46057eebb",
+    "sub_job": "렌",
+    "world": "스카니아",
+    "level": 281,
+    "dojang_floor": 78
+  },
+  {
+    "character_name": "쓰꾸렌",
+    "ocid": "eddf54c1b85cf59945b800aa74666fe1efe8d04e6d233bd35cf2fabdeb93fb0d",
+    "sub_job": "렌",
+    "world": "루나",
+    "level": 287,
+    "dojang_floor": 78
+  },
+  {
+    "character_name": "렌영v",
+    "ocid": "8c13285030e572deb305de9bbe6db0aeefe8d04e6d233bd35cf2fabdeb93fb0d",
+    "sub_job": "렌",
+    "world": "루나",
+    "level": 288,
+    "dojang_floor": 78
+  },
+  {
+    "character_name": "룬란",
+    "ocid": "601dcce201cc58223f2f9f4141cb9c63",
+    "sub_job": "렌",
+    "world": "스카니아",
+    "level": 287,
+    "dojang_floor": 78
+  },
+  {
+    "character_name": "홍매화랑",
+    "ocid": "0bd4da66a65a9b121efe3d3b06ab6ad6",
+    "sub_job": "렌",
+    "world": "스카니아",
+    "level": 286,
+    "dojang_floor": 77
+  },
+  {
+    "character_name": "파레니야",
+    "ocid": "2181b51c4ec2408a3064076756d417e8efe8d04e6d233bd35cf2fabdeb93fb0d",
+    "sub_job": "렌",
+    "world": "루나",
+    "level": 285,
+    "dojang_floor": 77
+  },
+  {
+    "character_name": "매커",
+    "ocid": "7c11a003f891545461c38ae1ab1d9ca7",
+    "sub_job": "렌",
+    "world": "스카니아",
+    "level": 288,
+    "dojang_floor": 77
+  },
+  {
+    "character_name": "매화검도둑렌",
+    "ocid": "8d5175dec836756f623b30b896e9aaefefe8d04e6d233bd35cf2fabdeb93fb0d",
+    "sub_job": "렌",
+    "world": "루나",
+    "level": 286,
+    "dojang_floor": 77
+  },
+  {
+    "character_name": "12월22일",
+    "ocid": "d56ce9f1f3d84a4c8aac85b26ca993a1efe8d04e6d233bd35cf2fabdeb93fb0d",
+    "sub_job": "렌",
+    "world": "루나",
+    "level": 286,
+    "dojang_floor": 76
+  },
+  {
+    "character_name": "아키레무",
+    "ocid": "185dbf0d9fe0bb0816463fbd91f58fe9",
+    "sub_job": "렌",
+    "world": "스카니아",
+    "level": 287,
+    "dojang_floor": 76
+  },
+  {
+    "character_name": "패릿",
+    "ocid": "588928e56d3b1ef6b86f1088ce047511",
+    "sub_job": "아델",
+    "world": "스카니아",
+    "level": 296,
+    "dojang_floor": 100
+  },
+  {
+    "character_name": "부장",
+    "ocid": "6866fdccad0ac47589e932bab81c2078",
+    "sub_job": "아델",
+    "world": "스카니아",
+    "level": 296,
+    "dojang_floor": 96
+  },
+  {
+    "character_name": "채콩",
+    "ocid": "dcec1cf65a021a4021b0496d35ad6c07",
+    "sub_job": "아델",
+    "world": "스카니아",
+    "level": 298,
+    "dojang_floor": 94
+  },
+  {
+    "character_name": "체뜨",
+    "ocid": "7bc002ef18a33ebe404b9a6b81c28f05efe8d04e6d233bd35cf2fabdeb93fb0d",
+    "sub_job": "아델",
+    "world": "루나",
+    "level": 296,
+    "dojang_floor": 93
+  },
+  {
+    "character_name": "윤기",
+    "ocid": "f312b58a4e83e73ef1d66da705baf126efe8d04e6d233bd35cf2fabdeb93fb0d",
+    "sub_job": "아델",
+    "world": "루나",
+    "level": 295,
+    "dojang_floor": 91
+  },
+  {
+    "character_name": "루뗄팡",
+    "ocid": "f3e27053651ef84a4e4436e9f550b1ce",
+    "sub_job": "아델",
+    "world": "스카니아",
+    "level": 295,
+    "dojang_floor": 89
+  },
+  {
+    "character_name": "런죠",
+    "ocid": "184040079494b5193e8da4bcf29913bd",
+    "sub_job": "아델",
+    "world": "스카니아",
+    "level": 290,
+    "dojang_floor": 86
+  },
+  {
+    "character_name": "젤다",
+    "ocid": "0d9cebb110936278907f3c2025008a11",
+    "sub_job": "아델",
+    "world": "루나",
+    "level": 296,
+    "dojang_floor": 85
+  },
+  {
+    "character_name": "연님",
+    "ocid": "c28adf632498c3a3d6ce87c16ad2157d",
+    "sub_job": "아델",
+    "world": "스카니아",
+    "level": 298,
+    "dojang_floor": 85
+  },
+  {
+    "character_name": "복습",
+    "ocid": "c15f100a1280b1f025698cbf6fbe729e",
+    "sub_job": "아델",
+    "world": "스카니아",
+    "level": 295,
+    "dojang_floor": 85
+  },
+  {
+    "character_name": "찰키",
+    "ocid": "db850ffc7ca7d86ef24064dac839bc81",
+    "sub_job": "아델",
+    "world": "스카니아",
+    "level": 292,
+    "dojang_floor": 84
+  },
+  {
+    "character_name": "히석",
+    "ocid": "1ea49233aeb6b68c54e3d6176aee1246",
+    "sub_job": "아델",
+    "world": "루나",
+    "level": 292,
+    "dojang_floor": 84
+  },
+  {
+    "character_name": "틱배",
+    "ocid": "d357a21bfaeaf6336baa94764c7099e0",
+    "sub_job": "아델",
+    "world": "루나",
+    "level": 294,
+    "dojang_floor": 84
+  },
+  {
+    "character_name": "먹밍",
+    "ocid": "d4ae6395033d11025f4db6d540cbc1fc",
+    "sub_job": "아델",
+    "world": "루나",
+    "level": 296,
+    "dojang_floor": 83
+  },
+  {
+    "character_name": "뿌리꿀근",
+    "ocid": "cb905e9399e5c9ef2513a117a79c0487",
+    "sub_job": "아델",
+    "world": "스카니아",
+    "level": 286,
+    "dojang_floor": 83
+  },
+  {
+    "character_name": "농약군",
+    "ocid": "85735d7ff5426eb531ec3a29edb18a47efe8d04e6d233bd35cf2fabdeb93fb0d",
+    "sub_job": "아델",
+    "world": "루나",
+    "level": 295,
+    "dojang_floor": 82
+  },
+  {
+    "character_name": "찌무",
+    "ocid": "7328c34951741ea2c9fe2c4230f016bd",
+    "sub_job": "아델",
+    "world": "루나",
+    "level": 292,
+    "dojang_floor": 82
+  },
+  {
+    "character_name": "머두와대두",
+    "ocid": "3415feea50f0948ac0b2faca6e97d9d7",
+    "sub_job": "아델",
+    "world": "스카니아",
+    "level": 284,
+    "dojang_floor": 82
+  },
+  {
+    "character_name": "여루",
+    "ocid": "d853fe7d67e312b695fd20bb69b1f25c",
+    "sub_job": "아델",
+    "world": "스카니아",
+    "level": 293,
+    "dojang_floor": 81
+  },
+  {
+    "character_name": "꿈팬시",
+    "ocid": "c5560a083c599de7cb5442af4ba2948defe8d04e6d233bd35cf2fabdeb93fb0d",
+    "sub_job": "아델",
+    "world": "루나",
+    "level": 295,
+    "dojang_floor": 80
+  },
+  {
+    "character_name": "대리컨",
+    "ocid": "060b78ff8c1ba689085d713c4d22a424",
+    "sub_job": "아델",
+    "world": "스카니아",
+    "level": 292,
+    "dojang_floor": 80
+  },
+  {
+    "character_name": "도맹건",
+    "ocid": "c9a26eb51f69b72408cfc12bae81f134efe8d04e6d233bd35cf2fabdeb93fb0d",
+    "sub_job": "아델",
+    "world": "루나",
+    "level": 285,
+    "dojang_floor": 77
+  },
+  {
+    "character_name": "롯델시네마",
+    "ocid": "6c4d5acddb39b7da6f913fa248a6d0c1efe8d04e6d233bd35cf2fabdeb93fb0d",
+    "sub_job": "아델",
+    "world": "루나",
+    "level": 283,
+    "dojang_floor": 76
+  },
+  {
+    "character_name": "팟시르",
+    "ocid": "6fad9062c572a5ab1270799bf0bce98b",
+    "sub_job": "아델",
+    "world": "스카니아",
+    "level": 295,
+    "dojang_floor": 75
+  },
+  {
+    "character_name": "공란처리",
+    "ocid": "02779543ab12af8bb8130dd69582313e",
+    "sub_job": "아델",
+    "world": "스카니아",
+    "level": 286,
+    "dojang_floor": 74
+  },
+  {
+    "character_name": "웅델웅델",
+    "ocid": "de9e8127ce7756f5e61a64638b1c8568",
+    "sub_job": "아델",
+    "world": "스카니아",
+    "level": 291,
+    "dojang_floor": 74
+  },
+  {
+    "character_name": "아루르르러르",
+    "ocid": "101067d9541b4c57073f69d820ff1ada",
+    "sub_job": "아델",
+    "world": "스카니아",
+    "level": 290,
+    "dojang_floor": 74
+  },
+  {
+    "character_name": "아델휘바",
+    "ocid": "6f77a85510d49604b6e6fd2ed5bbce50",
+    "sub_job": "아델",
+    "world": "스카니아",
+    "level": 293,
+    "dojang_floor": 73
+  },
+  {
+    "character_name": "만해델",
+    "ocid": "2a9c27829d6168ad644ef9ba40017245efe8d04e6d233bd35cf2fabdeb93fb0d",
+    "sub_job": "아델",
+    "world": "루나",
+    "level": 288,
+    "dojang_floor": 72
+  },
+  {
+    "character_name": "형사특례법",
+    "ocid": "08e61eefe7eacd84ea3aac7b747ba97e",
+    "sub_job": "아델",
+    "world": "스카니아",
+    "level": 291,
+    "dojang_floor": 71
+  },
+  {
+    "character_name": "베르",
+    "ocid": "a71aac523f8d9cfa6b11a72aa1a8a89a",
+    "sub_job": "나이트로드",
+    "world": "루나",
+    "level": 294,
+    "dojang_floor": 94
+  },
+  {
+    "character_name": "손길",
+    "ocid": "523b655489c8151b353c89390f256590",
+    "sub_job": "나이트로드",
+    "world": "루나",
+    "level": 295,
+    "dojang_floor": 94
+  },
+  {
+    "character_name": "우냐",
+    "ocid": "3c1e7edb29dfdc69a1fc0751af17e9aa",
+    "sub_job": "나이트로드",
+    "world": "스카니아",
+    "level": 291,
+    "dojang_floor": 93
+  },
+  {
+    "character_name": "연서",
+    "ocid": "d9a922057e2c0a03384c6d30d9e00ee6",
+    "sub_job": "나이트로드",
+    "world": "스카니아",
+    "level": 293,
+    "dojang_floor": 92
+  },
+  {
+    "character_name": "Tira",
+    "ocid": "ed687a26fde2e7b3852b6b1409bd2af3",
+    "sub_job": "나이트로드",
+    "world": "스카니아",
+    "level": 289,
+    "dojang_floor": 90
+  },
+  {
+    "character_name": "김흐시",
+    "ocid": "af987d13bb699ea56cde6f94fe30f40a",
+    "sub_job": "나이트로드",
+    "world": "루나",
+    "level": 292,
+    "dojang_floor": 89
+  },
+  {
+    "character_name": "향나무",
+    "ocid": "15e96aaf73d38ee3a452df5273967409efe8d04e6d233bd35cf2fabdeb93fb0d",
+    "sub_job": "나이트로드",
+    "world": "루나",
+    "level": 294,
+    "dojang_floor": 89
+  },
+  {
+    "character_name": "한계",
+    "ocid": "5352b52492e2ed5f095df43d9bcf62a6",
+    "sub_job": "나이트로드",
+    "world": "스카니아",
+    "level": 298,
+    "dojang_floor": 89
+  },
+  {
+    "character_name": "구구단",
+    "ocid": "1359bb42fa9ed0b342b2717af5772889",
+    "sub_job": "나이트로드",
+    "world": "루나",
+    "level": 295,
+    "dojang_floor": 89
+  },
+  {
+    "character_name": "Gerrit",
+    "ocid": "a539956206c09276a6de2619a73ba07f",
+    "sub_job": "나이트로드",
+    "world": "루나",
+    "level": 291,
+    "dojang_floor": 88
+  },
+  {
+    "character_name": "이겨와이",
+    "ocid": "72bb4b0d5f9f4d248b292bccfe5a0285",
+    "sub_job": "나이트로드",
+    "world": "루나",
+    "level": 290,
+    "dojang_floor": 87
+  },
+  {
+    "character_name": "남고딩",
+    "ocid": "6ad80a299bf07dd663f3bc14dff93b67efe8d04e6d233bd35cf2fabdeb93fb0d",
+    "sub_job": "나이트로드",
+    "world": "루나",
+    "level": 295,
+    "dojang_floor": 87
+  },
+  {
+    "character_name": "링딩동",
+    "ocid": "b93356b7b8edcbc6bf6307e6f8da17d8",
+    "sub_job": "나이트로드",
+    "world": "스카니아",
+    "level": 286,
+    "dojang_floor": 86
+  },
+  {
+    "character_name": "섹곤쭝",
+    "ocid": "78c360207fb188cb8288a7a68c5a85b5",
+    "sub_job": "나이트로드",
+    "world": "스카니아",
+    "level": 290,
+    "dojang_floor": 86
+  },
+  {
+    "character_name": "주피터king",
+    "ocid": "d1ee433713ca90bd13caa72e5719d91a",
+    "sub_job": "나이트로드",
+    "world": "루나",
+    "level": 297,
+    "dojang_floor": 85
+  },
+  {
+    "character_name": "집정원",
+    "ocid": "05c047742559aadf0d19805f99e8e0b1",
+    "sub_job": "나이트로드",
+    "world": "루나",
+    "level": 290,
+    "dojang_floor": 84
+  },
+  {
+    "character_name": "히장",
+    "ocid": "155e8b1a44a0eda0abd4f8839561b87e",
+    "sub_job": "나이트로드",
+    "world": "스카니아",
+    "level": 293,
+    "dojang_floor": 83
+  },
+  {
+    "character_name": "캐리닷",
+    "ocid": "c28d9bed050840eb05639e0fb0900b0d",
+    "sub_job": "나이트로드",
+    "world": "루나",
+    "level": 290,
+    "dojang_floor": 83
+  },
+  {
+    "character_name": "눈도시",
+    "ocid": "b3a543fde8125904d671a6171518f274efe8d04e6d233bd35cf2fabdeb93fb0d",
+    "sub_job": "나이트로드",
+    "world": "루나",
+    "level": 291,
+    "dojang_floor": 80
+  },
+  {
+    "character_name": "극극딜",
+    "ocid": "abe6f81e514fd040b52909feb46575e4",
+    "sub_job": "나이트로드",
+    "world": "루나",
+    "level": 290,
+    "dojang_floor": 80
+  },
+  {
+    "character_name": "로음",
+    "ocid": "5ce219209348c993ac0e5eaf42df7bf1",
+    "sub_job": "나이트로드",
+    "world": "스카니아",
+    "level": 291,
+    "dojang_floor": 79
+  },
+  {
+    "character_name": "옛공",
+    "ocid": "8a573adc1876bab50e8ff88bcaeda1bc",
+    "sub_job": "나이트로드",
+    "world": "스카니아",
+    "level": 291,
+    "dojang_floor": 79
+  },
+  {
+    "character_name": "zl존렁클",
+    "ocid": "47f5f2c7c1ee29493991df751d0a4eb2efe8d04e6d233bd35cf2fabdeb93fb0d",
+    "sub_job": "나이트로드",
+    "world": "루나",
+    "level": 290,
+    "dojang_floor": 78
+  },
+  {
+    "character_name": "쩡봄",
+    "ocid": "65fb8d11b11c84ad91c46431ac34e6a1efe8d04e6d233bd35cf2fabdeb93fb0d",
+    "sub_job": "나이트로드",
+    "world": "루나",
+    "level": 285,
+    "dojang_floor": 77
+  },
+  {
+    "character_name": "씹듣보",
+    "ocid": "ad238b85de8d8ec33266e2e7b5929bc3",
+    "sub_job": "나이트로드",
+    "world": "루나",
+    "level": 289,
+    "dojang_floor": 73
+  },
+  {
+    "character_name": "전설의드론",
+    "ocid": "b785eb3e8188b09ac4498524f57b665e",
+    "sub_job": "나이트로드",
+    "world": "루나",
+    "level": 292,
+    "dojang_floor": 71
+  },
+  {
+    "character_name": "율뮬륭",
+    "ocid": "1ce00e6a1d6dd57e9e7cd8397d1bf97f",
+    "sub_job": "나이트로드",
+    "world": "스카니아",
+    "level": 284,
+    "dojang_floor": 67
+  },
+  {
+    "character_name": "오뺘",
+    "ocid": "dbb00fbfd9f68115014cbb59103089ad",
+    "sub_job": "나이트로드",
+    "world": "스카니아",
+    "level": 287,
+    "dojang_floor": 65
+  },
+  {
+    "character_name": "쉐어",
+    "ocid": "2435a25df31d8105c0d0572ba2bcf247a2186d8e7cf7a6ee152d97cc78f2ae8b",
+    "sub_job": "나이트로드",
+    "world": "스카니아",
+    "level": 291,
+    "dojang_floor": 63
+  },
+  {
+    "character_name": "승준",
+    "ocid": "c7755efb2ed062711522e1c6b63abb05",
+    "sub_job": "비숍",
+    "world": "루나",
+    "level": 295,
+    "dojang_floor": 96
+  },
+  {
+    "character_name": "emmet7141",
+    "ocid": "5e41d9e31e522a25dda5f9332fe31af2",
+    "sub_job": "비숍",
+    "world": "루나",
+    "level": 295,
+    "dojang_floor": 91
+  },
+  {
+    "character_name": "다훈",
+    "ocid": "c6b23a086d275f1c38d53ef5d3dee86c",
+    "sub_job": "비숍",
+    "world": "스카니아",
+    "level": 294,
+    "dojang_floor": 91
+  },
+  {
+    "character_name": "심탱",
+    "ocid": "b2f81615c36330d57f2d925f94c10182efe8d04e6d233bd35cf2fabdeb93fb0d",
+    "sub_job": "비숍",
+    "world": "루나",
+    "level": 294,
+    "dojang_floor": 90
+  },
+  {
+    "character_name": "롼밈",
+    "ocid": "66a3e16f60f9cb8b639061d198c21b6cefe8d04e6d233bd35cf2fabdeb93fb0d",
+    "sub_job": "비숍",
+    "world": "루나",
+    "level": 294,
+    "dojang_floor": 90
+  },
+  {
+    "character_name": "무쥬",
+    "ocid": "a205f305fb5114829b34f8ce74904ac4",
+    "sub_job": "비숍",
+    "world": "스카니아",
+    "level": 296,
+    "dojang_floor": 88
+  },
+  {
+    "character_name": "쀼킴",
+    "ocid": "2162a3c503ed30a7bcce211ff2f47a58",
+    "sub_job": "비숍",
+    "world": "스카니아",
+    "level": 292,
+    "dojang_floor": 88
+  },
+  {
+    "character_name": "마지캬루",
+    "ocid": "1fb8aeeca6c92e0c92032a050a9c1b72efe8d04e6d233bd35cf2fabdeb93fb0d",
+    "sub_job": "비숍",
+    "world": "루나",
+    "level": 294,
+    "dojang_floor": 87
+  },
+  {
+    "character_name": "지슈",
+    "ocid": "86f32ff5436a2749d5f7b7e410606637",
+    "sub_job": "비숍",
+    "world": "스카니아",
+    "level": 292,
+    "dojang_floor": 87
+  },
+  {
+    "character_name": "으잉귤",
+    "ocid": "3bacb2be2bd14d3533016ef155e4a208",
+    "sub_job": "비숍",
+    "world": "스카니아",
+    "level": 293,
+    "dojang_floor": 87
+  },
+  {
+    "character_name": "피어나",
+    "ocid": "739b387d6cc29ee304d6ff3fa7a93ade",
+    "sub_job": "비숍",
+    "world": "스카니아",
+    "level": 293,
+    "dojang_floor": 86
+  },
+  {
+    "character_name": "구서",
+    "ocid": "d50e336af6ffb8e38c3530b824c00d83",
+    "sub_job": "비숍",
+    "world": "스카니아",
+    "level": 295,
+    "dojang_floor": 86
+  },
+  {
+    "character_name": "다혜",
+    "ocid": "79350faee1cd8ad9ea005a3c7b7181b2",
+    "sub_job": "비숍",
+    "world": "루나",
+    "level": 292,
+    "dojang_floor": 86
+  },
+  {
+    "character_name": "기업",
+    "ocid": "d6270ca75bb9d6a12e01da62fb95ac04",
+    "sub_job": "비숍",
+    "world": "스카니아",
+    "level": 293,
+    "dojang_floor": 85
+  },
+  {
+    "character_name": "친우",
+    "ocid": "1b0980c9685c37b2d0dd69b18c29d39c",
+    "sub_job": "비숍",
+    "world": "스카니아",
+    "level": 293,
+    "dojang_floor": 85
+  },
+  {
+    "character_name": "Crazy",
+    "ocid": "126fee11a77714ad283e00faeb97f4c9",
+    "sub_job": "비숍",
+    "world": "루나",
+    "level": 294,
+    "dojang_floor": 84
+  },
+  {
+    "character_name": "루댄",
+    "ocid": "fc94166f5cee9db6c36092ae144da252",
+    "sub_job": "비숍",
+    "world": "루나",
+    "level": 287,
+    "dojang_floor": 84
+  },
+  {
+    "character_name": "나비숍이욤",
+    "ocid": "0ef821d5448e5570901c1e8280357c12efe8d04e6d233bd35cf2fabdeb93fb0d",
+    "sub_job": "비숍",
+    "world": "루나",
+    "level": 294,
+    "dojang_floor": 84
+  },
+  {
+    "character_name": "여행자",
+    "ocid": "6b15d580858c79d0361f846891cf7c15",
+    "sub_job": "비숍",
+    "world": "스카니아",
+    "level": 293,
+    "dojang_floor": 83
+  },
+  {
+    "character_name": "김덕만2세",
+    "ocid": "eb9e6dea6b0df61d8d2628222c0213cc",
+    "sub_job": "비숍",
+    "world": "스카니아",
+    "level": 293,
+    "dojang_floor": 82
+  },
+  {
+    "character_name": "Or가모법",
+    "ocid": "63633b41702303ca585425fffd86e8bb",
+    "sub_job": "비숍",
+    "world": "스카니아",
+    "level": 285,
+    "dojang_floor": 82
+  },
+  {
+    "character_name": "하와와와왕",
+    "ocid": "55e5f5bf9bda53660ad6b3a5253326f3efe8d04e6d233bd35cf2fabdeb93fb0d",
+    "sub_job": "비숍",
+    "world": "루나",
+    "level": 295,
+    "dojang_floor": 82
+  },
+  {
+    "character_name": "딧나",
+    "ocid": "dc4136369f9a4596c27cce746e9632e5efe8d04e6d233bd35cf2fabdeb93fb0d",
+    "sub_job": "비숍",
+    "world": "루나",
+    "level": 290,
+    "dojang_floor": 81
+  },
+  {
+    "character_name": "Ruth",
+    "ocid": "588ed5903e2c63202f9768952b5f69c8",
+    "sub_job": "비숍",
+    "world": "스카니아",
+    "level": 291,
+    "dojang_floor": 81
+  },
+  {
+    "character_name": "by비숍",
+    "ocid": "02ea318501e2667588d2b102463bd6da",
+    "sub_job": "비숍",
+    "world": "루나",
+    "level": 292,
+    "dojang_floor": 79
+  },
+  {
+    "character_name": "리냥",
+    "ocid": "5ec8eed09627b92e9889c5ea77ee824d",
+    "sub_job": "비숍",
+    "world": "스카니아",
+    "level": 291,
+    "dojang_floor": 78
+  },
+  {
+    "character_name": "솜설",
+    "ocid": "2c1a3daace537039e8bdf539ed421b85",
+    "sub_job": "비숍",
+    "world": "스카니아",
+    "level": 288,
+    "dojang_floor": 76
+  },
+  {
+    "character_name": "히내",
+    "ocid": "0334fef61381623d75a440bd53a7701a",
+    "sub_job": "비숍",
+    "world": "스카니아",
+    "level": 290,
+    "dojang_floor": 76
+  },
+  {
+    "character_name": "쭈유e",
+    "ocid": "b4e53cc7c31dc55911807e1eee1e865a",
+    "sub_job": "비숍",
+    "world": "스카니아",
+    "level": 288,
+    "dojang_floor": 72
+  },
+  {
+    "character_name": "솔로만즐김",
+    "ocid": "468879d74f093fdb01f2293cae7e1b72",
+    "sub_job": "아크메이지(썬,콜)",
+    "world": "스카니아",
+    "level": 290,
+    "dojang_floor": 94
+  },
+  {
+    "character_name": "정벌",
+    "ocid": "6069947a9f1c2e89a7e4f444125158b9",
+    "sub_job": "아크메이지(썬,콜)",
+    "world": "스카니아",
+    "level": 295,
+    "dojang_floor": 87
+  },
+  {
+    "character_name": "챌리",
+    "ocid": "acea2d2223273b935505888453660058",
+    "sub_job": "아크메이지(썬,콜)",
+    "world": "스카니아",
+    "level": 296,
+    "dojang_floor": 86
+  },
+  {
+    "character_name": "킹온",
+    "ocid": "dae9924e7eefabae14fa83abcbd2c4da",
+    "sub_job": "아크메이지(썬,콜)",
+    "world": "루나",
+    "level": 296,
+    "dojang_floor": 83
+  },
+  {
+    "character_name": "달빛마법사",
+    "ocid": "c96376972d972cd4a3a3e5cc17284749",
+    "sub_job": "아크메이지(썬,콜)",
+    "world": "루나",
+    "level": 295,
+    "dojang_floor": 83
+  },
+  {
+    "character_name": "빙쥬",
+    "ocid": "2294bf3b1f3fde4aa7697f884643964d",
+    "sub_job": "아크메이지(썬,콜)",
+    "world": "스카니아",
+    "level": 293,
+    "dojang_floor": 82
+  },
+  {
+    "character_name": "혜슝",
+    "ocid": "1f50bc7910b734b17555271c0bfd54e4",
+    "sub_job": "아크메이지(썬,콜)",
+    "world": "루나",
+    "level": 293,
+    "dojang_floor": 81
+  },
+  {
+    "character_name": "조각망겜",
+    "ocid": "602f8a7f96eff3e4447b783a74001b68",
+    "sub_job": "아크메이지(썬,콜)",
+    "world": "루나",
+    "level": 289,
+    "dojang_floor": 81
+  },
+  {
+    "character_name": "꽃채솔",
+    "ocid": "78ce107732ccdbd63faa87b79615965e",
+    "sub_job": "아크메이지(썬,콜)",
+    "world": "루나",
+    "level": 295,
+    "dojang_floor": 79
+  },
+  {
+    "character_name": "빙하",
+    "ocid": "9b25fdf20fa42416ccd0952685e8c9a6",
+    "sub_job": "아크메이지(썬,콜)",
+    "world": "스카니아",
+    "level": 292,
+    "dojang_floor": 76
+  },
+  {
+    "character_name": "꼬재v",
+    "ocid": "eb6829dc22be87505089501fa30335bc",
+    "sub_job": "아크메이지(썬,콜)",
+    "world": "루나",
+    "level": 291,
+    "dojang_floor": 71
+  },
+  {
+    "character_name": "힐쿵",
+    "ocid": "80818fc93423afeba858aa63ea9d0381efe8d04e6d233bd35cf2fabdeb93fb0d",
+    "sub_job": "아크메이지(썬,콜)",
+    "world": "루나",
+    "level": 288,
+    "dojang_floor": 71
+  },
+  {
+    "character_name": "다른거할거좀",
+    "ocid": "6bb8f272a5a25f7c2ba590570db0ef7aefe8d04e6d233bd35cf2fabdeb93fb0d",
+    "sub_job": "아크메이지(썬,콜)",
+    "world": "루나",
+    "level": 286,
+    "dojang_floor": 70
+  },
+  {
+    "character_name": "페그오허쉴",
+    "ocid": "ec5d3be5dd7e7157bac9a4873490fdef",
+    "sub_job": "아크메이지(썬,콜)",
+    "world": "스카니아",
+    "level": 287,
+    "dojang_floor": 70
+  },
+  {
+    "character_name": "준영이내꺼야",
+    "ocid": "c8577b323176e8426cdfa90d6e71b3f8",
+    "sub_job": "아크메이지(썬,콜)",
+    "world": "스카니아",
+    "level": 286,
+    "dojang_floor": 67
+  },
+  {
+    "character_name": "삼육리더스",
+    "ocid": "a25ad8a0bd11a39a65fe21c45ac743aeefe8d04e6d233bd35cf2fabdeb93fb0d",
+    "sub_job": "아크메이지(썬,콜)",
+    "world": "루나",
+    "level": 284,
+    "dojang_floor": 64
+  },
+  {
+    "character_name": "썬더콜드묵향",
+    "ocid": "f1ddb13fbb37dd1bb838cff0b3be31f3",
+    "sub_job": "아크메이지(썬,콜)",
+    "world": "루나",
+    "level": 286,
+    "dojang_floor": 63
+  },
+  {
+    "character_name": "아기와나",
+    "ocid": "607a55dade2b9ee0b175588360b23bb9",
+    "sub_job": "아크메이지(썬,콜)",
+    "world": "루나",
+    "level": 279,
+    "dojang_floor": 61
+  },
+  {
+    "character_name": "루나썬콜",
+    "ocid": "19bd0610fe2fc268fadf8ef5452f7631",
+    "sub_job": "아크메이지(썬,콜)",
+    "world": "루나",
+    "level": 299,
+    "dojang_floor": 60
+  },
+  {
+    "character_name": "루타용법사",
+    "ocid": "044be51341c3c43ee46700d268909d21",
+    "sub_job": "아크메이지(썬,콜)",
+    "world": "루나",
+    "level": 286,
+    "dojang_floor": 59
+  },
+  {
+    "character_name": "삼은규",
+    "ocid": "a2c7a280377e3f5e17291ed1c463a4b3",
+    "sub_job": "아크메이지(썬,콜)",
+    "world": "스카니아",
+    "level": 277,
+    "dojang_floor": 59
+  },
+  {
+    "character_name": "누이비통",
+    "ocid": "68c55be87916bbf2f998896e661402b6",
+    "sub_job": "아크메이지(썬,콜)",
+    "world": "스카니아",
+    "level": 290,
+    "dojang_floor": 59
+  },
+  {
+    "character_name": "생크림때늅",
+    "ocid": "4da5076582ca91eec5f8490d70f07be1",
+    "sub_job": "아크메이지(썬,콜)",
+    "world": "스카니아",
+    "level": 282,
+    "dojang_floor": 59
+  },
+  {
+    "character_name": "오빠경남스탈",
+    "ocid": "651e8acf36697843fb38b25ed6f1f7d6",
+    "sub_job": "아크메이지(썬,콜)",
+    "world": "스카니아",
+    "level": 283,
+    "dojang_floor": 54
+  },
+  {
+    "character_name": "성대학식충",
+    "ocid": "862ca4ae11d715ef6eb37ba694fcb364",
+    "sub_job": "아크메이지(썬,콜)",
+    "world": "스카니아",
+    "level": 290,
+    "dojang_floor": 50
+  },
+  {
+    "character_name": "도111",
+    "ocid": "dacbadf3a0380b300a66cdc3eb42087c",
+    "sub_job": "아크메이지(썬,콜)",
+    "world": "루나",
+    "level": 276,
+    "dojang_floor": 49
+  },
+  {
+    "character_name": "헤l스",
+    "ocid": "0423cfa47c96fbc14413756b1d6c06fd",
+    "sub_job": "아크메이지(썬,콜)",
+    "world": "루나",
+    "level": 270,
+    "dojang_floor": 49
+  },
+  {
+    "character_name": "다니eee",
+    "ocid": "0e2f49d656b903627818e0fbdc5b4987efe8d04e6d233bd35cf2fabdeb93fb0d",
+    "sub_job": "아크메이지(썬,콜)",
+    "world": "루나",
+    "level": 276,
+    "dojang_floor": 47
+  }
+]
