@@ -19,6 +19,7 @@ sys.path.insert(0, base_dir)
 from load_ranker import load_ranker
 from load_ocid import create_user_ocid_table
 from load_character_info import load_character_info_by_endpoint
+from load_dw_daily import load_dw_for_date
 
 # 기본 인자 설정
 default_args = {
@@ -237,6 +238,22 @@ def load_character_info_task_func(api_key_name, **context):
     backfill_data(api_key, api_key_name, 'character_info', **context)
     return True
 
+
+def load_dw_task_func(**context):
+    """
+    DW 적재 작업: 집계일 1회 DW 로드
+    """
+    dates = get_reporting_date_with_fallback(**context)
+    if not dates:
+        print("DW 적재: 처리할 집계일이 없습니다.")
+        return True
+
+    for date in dates:
+        print(f"DW 적재 시작: {date}")
+        load_dw_for_date(date)
+        print(f"DW 적재 완료: {date}")
+    return True
+
 # API_KEY_1 작업 정의
 load_ranker_task_1 = PythonOperator(
     task_id='load_ranker_api_key_1',
@@ -281,7 +298,13 @@ load_character_info_task_2 = PythonOperator(
     dag=dag,
 )
 
+load_dw_task = PythonOperator(
+    task_id='load_dw',
+    python_callable=load_dw_task_func,
+    dag=dag,
+)
+
 # 작업 의존성 설정
 # API_KEY_1 순차 실행 -> API_KEY_2 순차 실행
 load_ranker_task_1 >> load_ocid_task_1 >> load_character_info_task_1 >> \
-load_ranker_task_2 >> load_ocid_task_2 >> load_character_info_task_2
+load_ranker_task_2 >> load_ocid_task_2 >> load_character_info_task_2 >> load_dw_task
