@@ -58,30 +58,55 @@ def get_execution_date(**context):
         except:
             return None
 
-def get_past_wednesdays(max_weeks=52, **context):
+def get_past_wednesdays(**context):
     """
-    과거 수요일 날짜들을 최신부터 과거 순서로 반환
-    max_weeks: 최대 몇 주 전까지 조회할지 (기본 52주 = 1년)
+    집계일 1개만 반환 (API 쿼리량 제한)
+    - 2025-06-18(포함) 이후: 최근 수요일
+    - 2025-06-18 이전: 해당 주 일요일
     """
-    execution_date = context.get('execution_date') or context.get('ds')
-    if isinstance(execution_date, str):
-        execution_date = datetime.strptime(execution_date, '%Y-%m-%d')
-    elif execution_date is None:
-        execution_date = datetime.now()
+    logical_date = context.get('logical_date') or context.get('execution_date') or context.get('ds')
+    if isinstance(logical_date, str):
+        current_date = datetime.strptime(logical_date, '%Y-%m-%d').date()
+    elif logical_date is None:
+        current_date = datetime.now().date()
+    else:
+        current_date = logical_date.date()
     
-    wednesdays = []
-    current_date = execution_date
+    cutoff_date = datetime(2025, 6, 18).date()
+    if current_date >= cutoff_date:
+        # 현재 날짜부터 과거로 거슬러 올라가며 가장 가까운 수요일 1개만 찾기
+        while current_date.weekday() != 2:  # 수요일
+            current_date -= timedelta(days=1)
+    else:
+        # 해당 주의 일요일(주 시작 기준) 1개만 찾기
+        # Python weekday(): 월=0, ... 일=6
+        days_since_sunday = (current_date.weekday() + 1) % 7
+        current_date = current_date - timedelta(days=days_since_sunday)
     
-    # 현재 날짜부터 과거로 거슬러 올라가며 수요일 찾기
-    for i in range(max_weeks * 7):  # 최대 max_weeks 주치
-        if current_date.weekday() == 2:  # 수요일
-            wednesdays.append(current_date.strftime('%Y-%m-%d'))
-        current_date -= timedelta(days=1)
-        
-        if len(wednesdays) >= max_weeks:
-            break
+    return [current_date.strftime('%Y-%m-%d')]
+
+def get_reporting_date_with_fallback(**context):
+    """
+    집계일 1개를 반환하되,
+    - 랭킹/OCID/캐릭터 정보가 모두 있으면 이전 주 집계일로 이동
+    - 랭킹만 있고 OCID/캐릭터 정보가 없으면 현재 집계일 유지
+    """
+    base_dates = get_past_wednesdays(**context)
+    if not base_dates:
+        return []
     
-    return wednesdays
+    base_date = base_dates[0]
+    has_ranking = check_data_exists(base_date, 'ranking')
+    has_ocid = check_data_exists(base_date, 'ocid')
+    has_character = check_data_exists(base_date, 'character_info')
+    
+    if has_ranking and has_ocid and has_character:
+        # 모두 있으면 이전 주 집계일로 이동
+        base_dt = datetime.strptime(base_date, '%Y-%m-%d').date()
+        previous_dt = base_dt - timedelta(days=7)
+        return [previous_dt.strftime('%Y-%m-%d')]
+    
+    return [base_date]
 
 def check_data_exists(date, data_type='ranking'):
     """
@@ -111,13 +136,13 @@ def backfill_data(api_key, api_key_name, data_type, **context):
     백필 로직: 과거 수요일 데이터를 최신부터 과거 순서로 수집
     data_type: 'ranking', 'ocid', 'character_info'
     """
-    past_wednesdays = get_past_wednesdays(max_weeks=52, **context)
+    past_wednesdays = get_reporting_date_with_fallback(**context)
     
     if not past_wednesdays:
         print(f"[{api_key_name}] 백필할 수요일 데이터가 없습니다.")
         return True
     
-    print(f"[{api_key_name}] {data_type} 백필 시작: 총 {len(past_wednesdays)}개 수요일")
+    print(f"[{api_key_name}] {data_type} 백필 시작: 총 {len(past_wednesdays)}개 집계일")
     
     success_count = 0
     skip_count = 0
@@ -176,7 +201,7 @@ def load_ranker_task_func(api_key_name, **context):
     else:
         api_key = config.API_KEY
     
-    print(f"[{api_key_name}] 백필 모드: 과거 수요일 랭킹 데이터 수집")
+    print(f"[{api_key_name}] 백필 모드: 집계일 1회 랭킹 데이터 수집")
     backfill_data(api_key, api_key_name, 'ranking', **context)
     return True
 
@@ -192,7 +217,7 @@ def load_ocid_task_func(api_key_name, **context):
     else:
         api_key = config.API_KEY
     
-    print(f"[{api_key_name}] 백필 모드: 과거 수요일 OCID 데이터 수집")
+    print(f"[{api_key_name}] 백필 모드: 집계일 1회 OCID 데이터 수집")
     backfill_data(api_key, api_key_name, 'ocid', **context)
     return True
 
@@ -208,7 +233,7 @@ def load_character_info_task_func(api_key_name, **context):
     else:
         api_key = config.API_KEY
     
-    print(f"[{api_key_name}] 백필 모드: 과거 수요일 캐릭터 정보 수집")
+    print(f"[{api_key_name}] 백필 모드: 집계일 1회 캐릭터 정보 수집")
     backfill_data(api_key, api_key_name, 'character_info', **context)
     return True
 
