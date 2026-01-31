@@ -88,26 +88,48 @@ def get_past_wednesdays(**context):
 
 def get_reporting_date_with_fallback(**context):
     """
-    집계일 1개를 반환하되,
+    집계일 1개를 반환 (DW 등 단일 날짜 필요 시 사용)
     - 랭킹/OCID/캐릭터 정보가 모두 있으면 이전 주 집계일로 이동
-    - 랭킹만 있고 OCID/캐릭터 정보가 없으면 현재 집계일 유지
+    - 그 외에는 현재 집계일 유지
     """
     base_dates = get_past_wednesdays(**context)
     if not base_dates:
         return []
-    
     base_date = base_dates[0]
     has_ranking = check_data_exists(base_date, 'ranking')
     has_ocid = check_data_exists(base_date, 'ocid')
     has_character = check_data_exists(base_date, 'character_info')
-    
     if has_ranking and has_ocid and has_character:
-        # 모두 있으면 이전 주 집계일로 이동
         base_dt = datetime.strptime(base_date, '%Y-%m-%d').date()
         previous_dt = base_dt - timedelta(days=7)
         return [previous_dt.strftime('%Y-%m-%d')]
-    
     return [base_date]
+
+
+def get_first_missing_date_backwards(data_type, max_weeks=52, **context):
+    """
+    최신 집계일부터 과거로 주차 단위로 탐색하여,
+    데이터가 존재하지 않는 첫 주차의 집계일 1개를 반환.
+    (ranker에서 이 로직으로 백필 대상을 정하고, ocid/character_info도 동일 방식 사용)
+    data_type: 'ranking' | 'ocid' | 'character_info'
+    """
+    base_dates = get_past_wednesdays(**context)
+    if not base_dates:
+        return []
+    start_date = datetime.strptime(base_dates[0], '%Y-%m-%d').date()
+    for week_idx in range(max_weeks):
+        check_dt = start_date - timedelta(days=7 * week_idx)
+        check_date = check_dt.strftime('%Y-%m-%d')
+        if data_type == 'ranking':
+            if not check_data_exists(check_date, 'ranking'):
+                return [check_date]
+        elif data_type == 'ocid':
+            if check_data_exists(check_date, 'ranking') and not check_data_exists(check_date, 'ocid'):
+                return [check_date]
+        elif data_type == 'character_info':
+            if check_data_exists(check_date, 'ocid') and not check_data_exists(check_date, 'character_info'):
+                return [check_date]
+    return []
 
 def check_data_exists(date, data_type='ranking'):
     """
@@ -134,16 +156,16 @@ def check_data_exists(date, data_type='ranking'):
 
 def backfill_data(api_key, api_key_name, data_type, **context):
     """
-    백필 로직: 과거 수요일 데이터를 최신부터 과거 순서로 수집
+    백필 로직: 데이터가 없는 주차가 나올 때까지 과거로 역순 탐색 후, 해당 1개 집계일만 수집
     data_type: 'ranking', 'ocid', 'character_info'
     """
-    past_wednesdays = get_reporting_date_with_fallback(**context)
-    
+    past_wednesdays = get_first_missing_date_backwards(data_type, max_weeks=52, **context)
+
     if not past_wednesdays:
-        print(f"[{api_key_name}] 백필할 수요일 데이터가 없습니다.")
+        print(f"[{api_key_name}] {data_type} 백필할 집계일 없음 (데이터 없음 주차까지 역순 탐색 완료)")
         return True
-    
-    print(f"[{api_key_name}] {data_type} 백필 시작: 총 {len(past_wednesdays)}개 집계일")
+
+    print(f"[{api_key_name}] {data_type} 백필 시작: 역순 탐색으로 발견한 1개 집계일 = {past_wednesdays[0]}")
     
     success_count = 0
     skip_count = 0
@@ -192,17 +214,24 @@ def backfill_data(api_key, api_key_name, data_type, **context):
 
 def load_ranker_task_func(api_key_name, **context):
     """
-    랭킹 데이터 수집 작업 (백필 모드)
+    랭킹 데이터 수집 작업 (백필 모드).
+    데이터 없음 주차가 나올 때까지 과거로 역순 탐색한 뒤, 그 1개 집계일만 수집.
     """
     import config
-    
-    # API_KEY 선택
+
+    # 역순 탐색으로 백필 대상 집계일 1개 결정 (로직은 ranker에서 찍음)
+    target_dates = get_first_missing_date_backwards('ranking', max_weeks=52, **context)
+    if target_dates:
+        print(f"[{api_key_name}] 백필 대상 집계일(역순 탐색): {target_dates[0]}")
+    else:
+        print(f"[{api_key_name}] 백필 대상 없음 (모든 탐색 주차에 랭킹 데이터 존재)")
+
     if api_key_name == 'API_KEY_1':
         api_key = config.API_KEY1
     else:
         api_key = config.API_KEY
-    
-    print(f"[{api_key_name}] 백필 모드: 집계일 1회 랭킹 데이터 수집")
+
+    print(f"[{api_key_name}] 백필 모드: 랭킹 데이터 수집 (역순 탐색 1회)")
     backfill_data(api_key, api_key_name, 'ranking', **context)
     return True
 
