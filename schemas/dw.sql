@@ -193,3 +193,25 @@ create table if not exists dw.dw_hyperstat (
 
 create index if not exists idx_dw_hyperstat_date on dw.dw_hyperstat (date);
 create index if not exists idx_dw_hyperstat_ocid on dw.dw_hyperstat (ocid);
+
+create table if not exists dw.collect_failed_master (
+    character_name text primary key,
+    reason text,
+    updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_collect_failed_master_updated_at on dw.collect_failed_master (updated_at);
+
+create table if not exists dw.stage_user_ocid (
+    date date not null,
+    character_name text not null,
+    ocid text not null,
+    sub_job text,
+    world text,
+    level integer,
+    dojang_floor integer,
+    primary key (date, character_name)
+);
+
+create index if not exists idx_stage_user_ocid_date on dw.stage_user_ocid (date);
+create index if not exists idx_stage_user_ocid_ocid on dw.stage_user_ocid (ocid);

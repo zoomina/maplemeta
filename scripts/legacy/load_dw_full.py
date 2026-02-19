@@ -12,7 +12,7 @@ DATE_PATTERN = re.compile(r"(\d{4}-\d{2}-\d{2})")
 def _data_json_dir(explicit_dir: str = None) -> str:
     if explicit_dir:
         return explicit_dir
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     return os.path.join(base_dir, "data_json")
 
 

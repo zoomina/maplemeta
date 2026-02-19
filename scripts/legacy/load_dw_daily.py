@@ -1,7 +1,9 @@
 import argparse
 import os
+import sys
 from typing import Optional
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from dw_load_utils import (
     ensure_dw_schema,
     get_dw_connection,
@@ -24,7 +26,7 @@ from dw_load_utils import (
 def _data_json_dir(explicit_dir: Optional[str] = None) -> str:
     if explicit_dir:
         return explicit_dir
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     return os.path.join(base_dir, "data_json")
 
 

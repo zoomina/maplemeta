@@ -4,22 +4,27 @@
 - 백필: 오늘 기준 과거 수요일 데이터를 최신부터 과거 순서로 수집
 순서: load_ranker -> load_ocid -> load_character_info (각 API_KEY별로)
 """
+import os
+import sys
 from datetime import datetime, timedelta
+
 from airflow import DAG
 from airflow.operators.python import PythonOperator
-import sys
-import os
 
 # scripts 디렉토리와 상위 디렉토리를 경로에 추가
-base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-scripts_dir = os.path.join(base_dir, 'scripts')
-sys.path.insert(0, scripts_dir)
-sys.path.insert(0, base_dir)
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SCRIPTS_DIR = os.path.join(BASE_DIR, "scripts")
+DATA_JSON_DIR = os.path.join(BASE_DIR, "data_json")
 
-from load_ranker import load_ranker
-from load_ocid import create_user_ocid_table
+for path in (SCRIPTS_DIR, BASE_DIR):
+    if path not in sys.path:
+        sys.path.insert(0, path)
+
+import config
 from load_character_info import load_character_info_by_endpoint
-from load_dw_daily import load_dw_for_date
+from load_ocid import create_user_ocid_table
+from load_ranker import load_ranker
+from dw_load_utils import ensure_dw_schema, get_dw_connection
 
 # 기본 인자 설정
 default_args = {
@@ -36,11 +41,24 @@ dag = DAG(
     'maplemeta_data_collection',
     default_args=default_args,
     description='메이플스토리 랭킹 및 캐릭터 정보 수집 DAG (백필 모드)',
-    schedule_interval=None,  # 수동 실행 또는 Airflow Variables로 스케줄 설정 가능
+    schedule_interval='0 8 * * *',  # 매일 오전 8시 실행
     start_date=datetime(2025, 1, 1),
     catchup=False,
     tags=['maplemeta', 'data_collection'],
 )
+
+def _resolve_api_key(api_key_name: str) -> str:
+    return config.resolve_api_key(api_key_name)
+
+
+def _resolve_current_date(**context):
+    logical_date = context.get("logical_date") or context.get("execution_date") or context.get("ds")
+    if isinstance(logical_date, str):
+        return datetime.strptime(logical_date, "%Y-%m-%d").date()
+    if logical_date is None:
+        return datetime.now().date()
+    return logical_date.date()
+
 
 def get_execution_date(**context):
     """
@@ -56,7 +74,7 @@ def get_execution_date(**context):
         from airflow.models import Variable
         try:
             return Variable.get("MAPLEMETA_DATE", default_var=None)
-        except:
+        except Exception:
             return None
 
 def get_past_wednesdays(**context):
@@ -65,13 +83,7 @@ def get_past_wednesdays(**context):
     - 2025-06-18(포함) 이후: 최근 수요일
     - 2025-06-18 이전: 해당 주 일요일
     """
-    logical_date = context.get('logical_date') or context.get('execution_date') or context.get('ds')
-    if isinstance(logical_date, str):
-        current_date = datetime.strptime(logical_date, '%Y-%m-%d').date()
-    elif logical_date is None:
-        current_date = datetime.now().date()
-    else:
-        current_date = logical_date.date()
+    current_date = _resolve_current_date(**context)
     
     cutoff_date = datetime(2025, 6, 18).date()
     if current_date >= cutoff_date:
@@ -85,44 +97,6 @@ def get_past_wednesdays(**context):
         current_date = current_date - timedelta(days=days_since_sunday)
     
     return [current_date.strftime('%Y-%m-%d')]
-
-def _is_dw_source_ready(date: str) -> bool:
-    return (
-        check_data_exists(date, 'ranking')
-        and check_data_exists(date, 'ocid')
-        and check_data_exists(date, 'character_info')
-    )
-
-
-def get_reporting_dates_for_dw(**context):
-    """
-    DW 적재 대상 집계일 목록을 반환.
-    우선순위:
-    1) 현재 집계일(base_date)이 준비되면 포함
-    2) 이전 주 집계일(previous_date)이 준비되면 추가 포함
-    """
-    results = []
-    seen = set()
-
-    def _append_if_ready(target_date: str):
-        if target_date in seen:
-            return
-        if _is_dw_source_ready(target_date):
-            results.append(target_date)
-            seen.add(target_date)
-
-    base_dates = get_past_wednesdays(**context)
-    if not base_dates:
-        return []
-    base_date = base_dates[0]
-    _append_if_ready(base_date)
-
-    base_dt = datetime.strptime(base_date, '%Y-%m-%d').date()
-    previous_dt = base_dt - timedelta(days=7)
-    _append_if_ready(previous_dt.strftime('%Y-%m-%d'))
-
-    return results
-
 
 def get_first_missing_date_backwards(data_type, max_weeks=52, **context):
     """
@@ -151,26 +125,38 @@ def get_first_missing_date_backwards(data_type, max_weeks=52, **context):
 
 def check_data_exists(date, data_type='ranking'):
     """
-    특정 날짜의 데이터 파일이 이미 존재하는지 확인
+    특정 날짜의 데이터가 DB에 이미 존재하는지 확인
     data_type: 'ranking', 'ocid', 'character_info'
     """
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    data_json_dir = os.path.join(base_dir, 'data_json')
-    
-    if data_type == 'ranking':
-        file_path = os.path.join(data_json_dir, f'dojang_ranking_{date}.json')
-    elif data_type == 'ocid':
-        file_path = os.path.join(data_json_dir, f'user_ocid_{date}.json')
-    elif data_type == 'character_info':
-        # 캐릭터 정보는 여러 파일이 있으므로 하나라도 있으면 True
-        endpoints = ['equipment', 'hexamatrix', 'set_effect', 'ability', 'hyper_stat']
-        for endpoint in endpoints:
-            file_path = os.path.join(data_json_dir, f'character_{endpoint}_{date}.json')
-            if os.path.exists(file_path):
+    conn = get_dw_connection()
+    ensure_dw_schema(conn)
+    try:
+        with conn.cursor() as cur:
+            if data_type == 'ranking':
+                cur.execute("select 1 from dw.dw_rank where date = %s::date limit 1", (date,))
+                return cur.fetchone() is not None
+
+            if data_type == 'ocid':
+                cur.execute("select 1 from dw.stage_user_ocid where date = %s::date limit 1", (date,))
+                return cur.fetchone() is not None
+
+            if data_type == 'character_info':
+                tables = [
+                    "dw.dw_equipment",
+                    "dw.dw_hexacore",
+                    "dw.dw_seteffect",
+                    "dw.dw_ability",
+                    "dw.dw_hyperstat",
+                ]
+                for table in tables:
+                    cur.execute(f"select 1 from {table} where date::date = %s::date limit 1", (date,))
+                    if cur.fetchone() is None:
+                        return False
                 return True
-        return False
-    
-    return os.path.exists(file_path)
+
+            raise ValueError(f"지원하지 않는 data_type: {data_type}")
+    finally:
+        conn.close()
 
 def backfill_data(api_key, api_key_name, data_type, **context):
     """
@@ -235,8 +221,6 @@ def load_ranker_task_func(api_key_name, **context):
     랭킹 데이터 수집 작업 (백필 모드).
     데이터 없음 주차가 나올 때까지 과거로 역순 탐색한 뒤, 그 1개 집계일만 수집.
     """
-    import config
-
     # 역순 탐색으로 백필 대상 집계일 1개 결정 (로직은 ranker에서 찍음)
     target_dates = get_first_missing_date_backwards('ranking', max_weeks=52, **context)
     if target_dates:
@@ -244,10 +228,7 @@ def load_ranker_task_func(api_key_name, **context):
     else:
         print(f"[{api_key_name}] 백필 대상 없음 (모든 탐색 주차에 랭킹 데이터 존재)")
 
-    if api_key_name == 'API_KEY_1':
-        api_key = config.API_KEY1
-    else:
-        api_key = config.API_KEY
+    api_key = _resolve_api_key(api_key_name)
 
     print(f"[{api_key_name}] 백필 모드: 랭킹 데이터 수집 (역순 탐색 1회)")
     backfill_data(api_key, api_key_name, 'ranking', **context)
@@ -257,13 +238,7 @@ def load_ocid_task_func(api_key_name, **context):
     """
     OCID 데이터 수집 작업 (백필 모드)
     """
-    import config
-    
-    # API_KEY 선택
-    if api_key_name == 'API_KEY_1':
-        api_key = config.API_KEY1
-    else:
-        api_key = config.API_KEY
+    api_key = _resolve_api_key(api_key_name)
     
     print(f"[{api_key_name}] 백필 모드: 집계일 1회 OCID 데이터 수집")
     backfill_data(api_key, api_key_name, 'ocid', **context)
@@ -273,37 +248,12 @@ def load_character_info_task_func(api_key_name, **context):
     """
     캐릭터 정보 수집 작업 (백필 모드)
     """
-    import config
-    
-    # API_KEY 선택
-    if api_key_name == 'API_KEY_1':
-        api_key = config.API_KEY1
-    else:
-        api_key = config.API_KEY
+    api_key = _resolve_api_key(api_key_name)
     
     print(f"[{api_key_name}] 백필 모드: 집계일 1회 캐릭터 정보 수집")
     backfill_data(api_key, api_key_name, 'character_info', **context)
     return True
 
-
-def load_dw_task_func(**context):
-    """
-    DW 적재 작업: 준비된 집계일들을 순차 DW 로드
-    """
-    dates = get_reporting_dates_for_dw(**context)
-    if not dates:
-        print("DW 적재: 처리할 집계일이 없습니다.")
-        return True
-
-    for date in dates:
-        print(f"DW 적재 시작: {date}")
-        try:
-            load_dw_for_date(date)
-        except Exception as e:
-            print(f"DW 적재 실패: {date}, error={e}")
-            raise
-        print(f"DW 적재 완료: {date}")
-    return True
 
 # API_KEY_1 작업 정의
 load_ranker_task_1 = PythonOperator(
@@ -349,13 +299,7 @@ load_character_info_task_2 = PythonOperator(
     dag=dag,
 )
 
-load_dw_task = PythonOperator(
-    task_id='load_dw',
-    python_callable=load_dw_task_func,
-    dag=dag,
-)
-
 # 작업 의존성 설정
 # API_KEY_1 순차 실행 -> API_KEY_2 순차 실행
 load_ranker_task_1 >> load_ocid_task_1 >> load_character_info_task_1 >> \
-load_ranker_task_2 >> load_ocid_task_2 >> load_character_info_task_2 >> load_dw_task
+load_ranker_task_2 >> load_ocid_task_2 >> load_character_info_task_2

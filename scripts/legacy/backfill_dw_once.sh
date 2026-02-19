@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${ROOT_DIR}"
 
 if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
@@ -13,7 +13,7 @@ else
   exit 1
 fi
 
-echo "[backfill] run full DW load for all json targets"
-"${COMPOSE_CMD[@]}" exec airflow-scheduler python /opt/airflow/scripts/load_dw_full.py
+echo "[legacy backfill] run full DW load for all json targets"
+"${COMPOSE_CMD[@]}" exec airflow-scheduler python /opt/airflow/scripts/legacy/load_dw_full.py
 
-echo "[backfill] done"
+echo "[legacy backfill] done"

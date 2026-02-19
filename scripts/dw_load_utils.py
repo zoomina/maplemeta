@@ -24,9 +24,12 @@ def get_dw_connection():
     2) DW_PG* env vars
     3) PG* env vars
     """
+    timezone = _get_env("DW_TIMEZONE") or "Asia/Seoul"
+    options = f"-c timezone={timezone}"
+
     url = _get_env("DW_DATABASE_URL") or _get_env("DATABASE_URL")
     if url:
-        return psycopg2.connect(url)
+        return psycopg2.connect(url, options=options)
 
     host = _get_env("DW_PGHOST") or _get_env("PGHOST")
     port = _get_env("DW_PGPORT") or _get_env("PGPORT")
@@ -59,6 +62,7 @@ def get_dw_connection():
         user=user,
         password=password,
         sslmode=sslmode,
+        options=options,
     )
 
 
@@ -67,6 +71,126 @@ def ensure_dw_schema(conn) -> None:
         with open(SCHEMA_SQL_PATH, "r", encoding="utf-8") as f:
             cur.execute(f.read())
     conn.commit()
+
+
+def fetch_rank_records_for_date(conn, date: str) -> List[Dict[str, Any]]:
+    sql = """
+        select
+            date::text as date,
+            total_rank,
+            world_rank,
+            floor,
+            record_sec,
+            character_name,
+            world,
+            job,
+            sub_job
+        from dw.dw_rank
+        where date = %s::date
+        order by total_rank asc nulls last
+    """
+    with conn.cursor() as cur:
+        cur.execute(sql, (date,))
+        rows = cur.fetchall()
+
+    results: List[Dict[str, Any]] = []
+    for row in rows:
+        results.append(
+            {
+                "날짜": row[0],
+                "통합순위": row[1],
+                "서버내순위": row[2],
+                "도장층수": row[3],
+                "기록시간(초)": row[4],
+                "캐릭터명": row[5],
+                "월드": row[6],
+                "직업군": row[7],
+                "세부직업": row[8],
+            }
+        )
+    return results
+
+
+def load_failed_master_from_db(conn) -> set:
+    with conn.cursor() as cur:
+        cur.execute("select character_name from dw.collect_failed_master")
+        rows = cur.fetchall()
+    return {row[0] for row in rows if row and row[0]}
+
+
+def upsert_failed_master_to_db(
+    conn,
+    failed_names: Iterable[str],
+    reason: str = "ocid_lookup_failed",
+) -> None:
+    names = sorted({name.strip() for name in failed_names if isinstance(name, str) and name.strip()})
+    if not names:
+        return
+
+    sql = """
+        insert into dw.collect_failed_master (character_name, reason, updated_at)
+        values %s
+        on conflict (character_name)
+        do update set
+            reason = excluded.reason,
+            updated_at = excluded.updated_at
+    """
+    rows = [(name, reason, datetime.utcnow()) for name in names]
+    with conn.cursor() as cur:
+        execute_values(cur, sql, rows, page_size=1000)
+    conn.commit()
+
+
+def upsert_stage_user_ocid(conn, date: str, users: Sequence[Dict[str, Any]]) -> None:
+    if not users:
+        return
+
+    columns = ["date", "character_name", "ocid", "sub_job", "world", "level", "dojang_floor"]
+    rows: List[Tuple[Any, ...]] = []
+    for user in users:
+        rows.append(
+            (
+                date,
+                user.get("character_name"),
+                user.get("ocid"),
+                user.get("sub_job"),
+                user.get("world"),
+                _parse_int(user.get("level")),
+                _parse_int(user.get("dojang_floor")),
+            )
+        )
+
+    _execute_upsert(conn, "dw.stage_user_ocid", columns, rows, ["date", "character_name"])
+
+
+def fetch_stage_user_ocid(conn, date: str) -> List[Dict[str, Any]]:
+    sql = """
+        select
+            ocid,
+            character_name,
+            sub_job,
+            world,
+            level,
+            dojang_floor
+        from dw.stage_user_ocid
+        where date = %s::date
+        order by sub_job asc nulls last, dojang_floor desc nulls last, character_name asc
+    """
+    with conn.cursor() as cur:
+        cur.execute(sql, (date,))
+        rows = cur.fetchall()
+
+    return [
+        {
+            "ocid": row[0],
+            "character_name": row[1],
+            "sub_job": row[2],
+            "world": row[3],
+            "level": row[4],
+            "dojang_floor": row[5],
+        }
+        for row in rows
+    ]
 
 
 def load_json_file(path: str) -> List[Dict[str, Any]]:
