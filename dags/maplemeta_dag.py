@@ -86,24 +86,42 @@ def get_past_wednesdays(**context):
     
     return [current_date.strftime('%Y-%m-%d')]
 
-def get_reporting_date_with_fallback(**context):
+def _is_dw_source_ready(date: str) -> bool:
+    return (
+        check_data_exists(date, 'ranking')
+        and check_data_exists(date, 'ocid')
+        and check_data_exists(date, 'character_info')
+    )
+
+
+def get_reporting_dates_for_dw(**context):
     """
-    집계일 1개를 반환 (DW 등 단일 날짜 필요 시 사용)
-    - 랭킹/OCID/캐릭터 정보가 모두 있으면 이전 주 집계일로 이동
-    - 그 외에는 현재 집계일 유지
+    DW 적재 대상 집계일 목록을 반환.
+    우선순위:
+    1) 현재 집계일(base_date)이 준비되면 포함
+    2) 이전 주 집계일(previous_date)이 준비되면 추가 포함
     """
+    results = []
+    seen = set()
+
+    def _append_if_ready(target_date: str):
+        if target_date in seen:
+            return
+        if _is_dw_source_ready(target_date):
+            results.append(target_date)
+            seen.add(target_date)
+
     base_dates = get_past_wednesdays(**context)
     if not base_dates:
         return []
     base_date = base_dates[0]
-    has_ranking = check_data_exists(base_date, 'ranking')
-    has_ocid = check_data_exists(base_date, 'ocid')
-    has_character = check_data_exists(base_date, 'character_info')
-    if has_ranking and has_ocid and has_character:
-        base_dt = datetime.strptime(base_date, '%Y-%m-%d').date()
-        previous_dt = base_dt - timedelta(days=7)
-        return [previous_dt.strftime('%Y-%m-%d')]
-    return [base_date]
+    _append_if_ready(base_date)
+
+    base_dt = datetime.strptime(base_date, '%Y-%m-%d').date()
+    previous_dt = base_dt - timedelta(days=7)
+    _append_if_ready(previous_dt.strftime('%Y-%m-%d'))
+
+    return results
 
 
 def get_first_missing_date_backwards(data_type, max_weeks=52, **context):
@@ -270,16 +288,20 @@ def load_character_info_task_func(api_key_name, **context):
 
 def load_dw_task_func(**context):
     """
-    DW 적재 작업: 집계일 1회 DW 로드
+    DW 적재 작업: 준비된 집계일들을 순차 DW 로드
     """
-    dates = get_reporting_date_with_fallback(**context)
+    dates = get_reporting_dates_for_dw(**context)
     if not dates:
         print("DW 적재: 처리할 집계일이 없습니다.")
         return True
 
     for date in dates:
         print(f"DW 적재 시작: {date}")
-        load_dw_for_date(date)
+        try:
+            load_dw_for_date(date)
+        except Exception as e:
+            print(f"DW 적재 실패: {date}, error={e}")
+            raise
         print(f"DW 적재 완료: {date}")
     return True
 

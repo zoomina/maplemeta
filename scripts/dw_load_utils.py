@@ -29,14 +29,28 @@ def get_dw_connection():
         return psycopg2.connect(url)
 
     host = _get_env("DW_PGHOST") or _get_env("PGHOST")
-    port = _get_env("DW_PGPORT") or _get_env("PGPORT", "5432")
+    port = _get_env("DW_PGPORT") or _get_env("PGPORT")
     dbname = _get_env("DW_PGDATABASE") or _get_env("PGDATABASE")
     user = _get_env("DW_PGUSER") or _get_env("PGUSER")
     password = _get_env("DW_PGPASSWORD") or _get_env("PGPASSWORD")
-    sslmode = _get_env("DW_SSLMODE") or _get_env("PGSSLMODE", "require")
+    sslmode = _get_env("DW_SSLMODE") or _get_env("PGSSLMODE")
 
-    if not host or not dbname or not user:
-        raise ValueError("DW database connection env vars are missing.")
+    any_explicit = any([host, port, dbname, user, password, sslmode])
+    if not any_explicit:
+        # Local docker-compose defaults (host machine execution).
+        host = "localhost"
+        port = "5432"
+        dbname = "airflow"
+        user = "airflow"
+        password = "airflow"
+        sslmode = "disable"
+    else:
+        if not host or not dbname or not user:
+            raise ValueError("DW database connection env vars are missing.")
+        if not port:
+            port = "5432"
+        if not sslmode:
+            sslmode = "require"
 
     return psycopg2.connect(
         host=host,
@@ -58,6 +72,25 @@ def ensure_dw_schema(conn) -> None:
 def load_json_file(path: str) -> List[Dict[str, Any]]:
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
+
+
+def _parse_timestamptz(value: Any) -> Optional[datetime]:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, str):
+        s = value.strip()
+        if s == "":
+            return None
+        if s.lower() in {"expired", "null", "none", "n/a"}:
+            return None
+        s = s.replace("Z", "+00:00")
+        try:
+            return datetime.fromisoformat(s)
+        except ValueError:
+            return None
+    return None
 
 
 def _parse_int(value: Any) -> Optional[int]:
@@ -117,6 +150,29 @@ def _execute_upsert(
     with conn.cursor() as cur:
         execute_values(cur, sql, rows, page_size=2000)
     conn.commit()
+
+
+def _dedupe_rows_by_conflict(
+    columns: Sequence[str],
+    rows: Sequence[Sequence[Any]],
+    conflict_cols: Sequence[str],
+) -> List[Sequence[Any]]:
+    """
+    Deduplicate rows by conflict key before execute_values upsert.
+    This prevents "ON CONFLICT ... cannot affect row a second time".
+    """
+    if not rows:
+        return []
+
+    col_index = {name: idx for idx, name in enumerate(columns)}
+    key_indexes = [col_index[name] for name in conflict_cols]
+    deduped: Dict[Tuple[Any, ...], Sequence[Any]] = {}
+
+    for row in rows:
+        key = tuple(row[idx] for idx in key_indexes)
+        deduped[key] = row
+
+    return list(deduped.values())
 
 
 def parse_rank_records(data: List[Dict[str, Any]]) -> List[Tuple[Any, ...]]:
@@ -332,7 +388,7 @@ def parse_equipment_records(data: List[Dict[str, Any]]) -> List[Tuple[Any, ...]]
                         item.get("starforce_scroll_flag"),
                         _to_json(item.get("item_starforce_option")),
                         _parse_int(item.get("special_ring_level")),
-                        item.get("date_expire"),
+                        _parse_timestamptz(item.get("date_expire")),
                         item.get("freestyle_flag"),
                         total.get("str"),
                         total.get("dex"),
@@ -596,12 +652,14 @@ def upsert_equipment(conn, rows: Sequence[Sequence[Any]]) -> None:
         "item_total_option__max_hp_rate",
         "item_total_option__max_mp_rate",
     ]
+    conflict_cols = ["date", "ocid", "equipment_list", "item_equipment_slot"]
+    rows = _dedupe_rows_by_conflict(columns, rows, conflict_cols)
     _execute_upsert(
         conn,
         "dw.dw_equipment",
         columns,
         rows,
-        ["date", "ocid", "equipment_list", "item_equipment_slot"],
+        conflict_cols,
     )
 
 

@@ -130,3 +130,33 @@ python scripts/backfill_ocid.py --date 2025-08-13
 ### OCID 조회 실패
 - 실패한 캐릭터는 자동으로 마스터 파일에 추가됩니다
 - 마스터 파일을 수동으로 수정하여 특정 캐릭터를 제외할 수 있습니다
+
+## DW 적재 로컬 검증
+
+### 1. Docker 실행
+```cmd
+docker compose up airflow-init
+docker compose up -d
+```
+
+### 2. 단건 DW 적재 테스트
+아래 예시는 데이터가 존재하는 날짜(예: `2026-02-11`) 기준입니다.
+
+```cmd
+docker compose exec airflow-scheduler python /opt/airflow/scripts/load_dw_daily.py --date 2026-02-11
+```
+
+### 3. 적재 결과 확인(SQL)
+```cmd
+docker compose exec postgres psql -U airflow -d airflow -c "select count(*) from dw.dw_rank where date='2026-02-11';"
+docker compose exec postgres psql -U airflow -d airflow -c "select count(*) from dw.dw_ability where date::date='2026-02-11';"
+docker compose exec postgres psql -U airflow -d airflow -c "select count(*) from dw.dw_equipment where date::date='2026-02-11';"
+docker compose exec postgres psql -U airflow -d airflow -c "select count(*) from dw.dw_hexacore where date::date='2026-02-11';"
+docker compose exec postgres psql -U airflow -d airflow -c "select count(*) from dw.dw_hyperstat where date::date='2026-02-11';"
+docker compose exec postgres psql -U airflow -d airflow -c "select count(*) from dw.dw_seteffect where date::date='2026-02-11';"
+```
+
+### 4. DAG 마지막 단계(`load_dw`) 검증
+1) Airflow UI에서 `maplemeta_data_collection` DAG를 트리거  
+2) 마지막 task인 `load_dw`가 `success`인지 확인  
+3) 위 SQL로 해당 집계일 row count가 0보다 큰지 확인  

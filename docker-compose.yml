@@ -1,5 +1,3 @@
-version: '3.8'
-
 x-airflow-common:
   &airflow-common
   image: apache/airflow:2.8.0
@@ -15,6 +13,7 @@ x-airflow-common:
     API_KEY: ${API_KEY:-}
     API_KEY_1: ${API_KEY_1:-}
     API_KEY_2: ${API_KEY_2:-}
+    DW_DATABASE_URL: ${DW_DATABASE_URL:-postgresql://airflow:airflow@postgres:5432/airflow}
   env_file:
     - ./.env
   volumes:
@@ -24,6 +23,7 @@ x-airflow-common:
     - ./config.py:/opt/airflow/config.py
     - ./logs:/opt/airflow/logs
     - ./plugins:/opt/airflow/plugins
+    - ./schemas:/opt/airflow/schemas
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
     &airflow-common-depends-on
@@ -44,6 +44,8 @@ services:
       interval: 10s
       retries: 5
       timeout: 5s
+    ports:
+      - "5432:5432"
     restart: always
 
   airflow-webserver:
@@ -84,8 +86,9 @@ services:
     command:
       - -c
       - |
+        set -e
         echo "Initializing Airflow database..."
-        airflow db migrate || airflow db upgrade
+        airflow db migrate
         echo "Creating admin user (if not exists)..."
         airflow users create \
           --username "$${_AIRFLOW_WWW_USER_USERNAME}" \
@@ -93,16 +96,16 @@ services:
           --firstname admin \
           --lastname admin \
           --role Admin \
-          --email admin@example.com || echo "User may already exist, skipping."
+          --email admin@example.com || true
         echo "Airflow init completed."
     environment:
       <<: *airflow-common-env
       _AIRFLOW_DB_MIGRATE: 'true'
       _AIRFLOW_WWW_USER_CREATE: 'true'
-      _AIRFLOW_WWW_USER_USERNAME: ${_AIRFLOW_WWW_USER_USERNAME:-airflow}
-      _AIRFLOW_WWW_USER_PASSWORD: ${_AIRFLOW_WWW_USER_PASSWORD:-airflow}
+      _AIRFLOW_WWW_USER_USERNAME: ${AIRFLOW_WWW_USER_USERNAME:-airflow}
+      _AIRFLOW_WWW_USER_PASSWORD: ${AIRFLOW_WWW_USER_PASSWORD:-airflow}
       _PIP_ADDITIONAL_REQUIREMENTS: ''
-    user: "0:0"
+    user: "${AIRFLOW_UID:-50000}:0"
     volumes:
       - ${AIRFLOW_PROJ_DIR:-.}:/sources
 
