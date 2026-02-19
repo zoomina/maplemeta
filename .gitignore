@@ -21,8 +21,8 @@ airflow.db
 airflow.cfg
 
 # 데이터 파일 (선택사항 - 필요시 제외)
-# data_json/
-# data_csv/
+data_json/
+data_csv/
 
 # IDE
 .vscode/
