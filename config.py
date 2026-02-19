@@ -1,8 +1,34 @@
 import os
+from typing import Optional
 
-# 환경 변수에서 API_KEY 읽기, 없으면 기본값 사용
-# API_KEY_1: 목요일용 (최근 수요일 데이터 수집)
-# API_KEY 또는 API_KEY_2: 평일용 (과거 수요일 데이터 백필)
-API_KEY1 = os.getenv("API_KEY_1") or os.getenv("API_KEY1", "test_e19e9e6e44c65995c472cb12a677b8e894475cf5f7c0a5f9b350cc8e423208d2efe8d04e6d233bd35cf2fabdeb93fb0d")
-API_KEY = os.getenv("API_KEY_2") or os.getenv("API_KEY", "test_703f78f0882eb117abf99d2892867023586e60eee209b9f499071dbf6b6db9dbefe8d04e6d233bd35cf2fabdeb93fb0d")
-DATE = os.getenv("DATE", "2025-08-13")
+
+def _clean_env(name: str) -> Optional[str]:
+    value = os.getenv(name)
+    if value is None:
+        return None
+    value = value.strip()
+    return value or None
+
+
+# API_KEY_1: 최근 수요일 수집용
+# API_KEY_2(API_KEY): 백필/일반 수집용
+API_KEY1 = _clean_env("API_KEY_1") or _clean_env("API_KEY1")
+API_KEY2 = _clean_env("API_KEY_2") or _clean_env("API_KEY")
+API_KEY = API_KEY2  # 기존 코드 호환용 별칭
+DATE = _clean_env("DATE") or "2025-08-13"
+
+
+def resolve_api_key(api_key_name: str) -> str:
+    if api_key_name == "API_KEY_1":
+        key = API_KEY1
+    elif api_key_name in {"API_KEY_2", "API_KEY"}:
+        key = API_KEY2
+    else:
+        raise ValueError(f"알 수 없는 API 키 이름: {api_key_name}")
+
+    if not key:
+        raise ValueError(
+            f"{api_key_name} 환경 변수가 비어 있습니다. "
+            "`.env` 파일에 API_KEY_1/API_KEY_2를 설정하세요."
+        )
+    return key

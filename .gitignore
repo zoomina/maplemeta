@@ -11,8 +11,8 @@ env.bak/
 venv.bak/
 
 # 환경 변수
-.env
-.env.local
+.env*
+!.env.example
 
 # Airflow
 logs/
@@ -38,3 +38,4 @@ Thumbs.db
 # 기타
 *.log
 *.tmp
+log_*.txt

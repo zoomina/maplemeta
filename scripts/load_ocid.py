@@ -1,48 +1,26 @@
 import requests
-import pandas as pd
-import json
 import time
 import sys
 import os
 
 # 상위 디렉토리의 config 모듈 import를 위한 경로 추가
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from config import API_KEY, DATE
-
-def load_failed_master(master_file_path="data_json/ocid_failed_master.json"):
-    """
-    실패 마스터 파일 로드 (없으면 빈 세트 반환)
-    """
-    if os.path.exists(master_file_path):
-        try:
-            with open(master_file_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                # 리스트 형태인지 확인
-                if isinstance(data, list):
-                    return set(item if isinstance(item, str) else item.get('character_name', '') for item in data)
-                elif isinstance(data, dict) and 'failed_characters' in data:
-                    return set(data['failed_characters'])
-                else:
-                    return set()
-        except Exception as e:
-            print(f"마스터 파일 로드 오류: {e}")
-            return set()
-    return set()
-
-def save_failed_master(failed_set, master_file_path="data_json/ocid_failed_master.json"):
-    """
-    실패 마스터 파일 저장
-    """
-    failed_list = sorted(list(failed_set))
-    with open(master_file_path, 'w', encoding='utf-8') as f:
-        json.dump(failed_list, f, ensure_ascii=False, indent=2)
+from config import DATE, resolve_api_key
+from dw_load_utils import (
+    ensure_dw_schema,
+    fetch_rank_records_for_date,
+    get_dw_connection,
+    load_failed_master_from_db,
+    upsert_failed_master_to_db,
+    upsert_stage_user_ocid,
+)
 
 def get_character_ocid(character_name, api_key=None):
     """
     캐릭터 이름으로 OCID 조회
     """
     if api_key is None:
-        from config import API_KEY as api_key
+        api_key = resolve_api_key("API_KEY_2")
     
     headers = {
         "x-nxopen-api-key": api_key
@@ -97,6 +75,12 @@ def analyze_job_distribution(ranking_data):
     
     return top_5_jobs
 
+
+def get_job_name(player):
+    sub_job = player.get('세부직업', '').strip()
+    main_job = player.get('직업군', '').strip()
+    return sub_job or main_job
+
 def get_top_players_by_job(ranking_data, target_jobs, top_n=30, failed_set=None):
     """
     특정 직업군의 상위 N명 선별 (실패 리스트 제외)
@@ -110,14 +94,7 @@ def get_top_players_by_job(ranking_data, target_jobs, top_n=30, failed_set=None)
         job_players = []
         
         for player in ranking_data:
-            sub_job = player.get('세부직업', '').strip()
-            main_job = player.get('직업군', '').strip()
-            
-            # 세부직업이 없거나 빈 문자열인 경우 직업군 사용
-            if not sub_job or sub_job == '':
-                player_job = main_job
-            else:
-                player_job = sub_job
+            player_job = get_job_name(player)
             
             # 실패 리스트에 있는 캐릭터 제외
             character_name = player.get('캐릭터명', '')
@@ -152,13 +129,7 @@ def fill_missing_players(ranking_data, target_jobs, current_count_by_job, failed
         
         job_players = []
         for player in ranking_data:
-            sub_job = player.get('세부직업', '').strip()
-            main_job = player.get('직업군', '').strip()
-            
-            if not sub_job or sub_job == '':
-                player_job = main_job
-            else:
-                player_job = sub_job
+            player_job = get_job_name(player)
             
             character_name = player.get('캐릭터명', '')
             if character_name in failed_set:
@@ -177,158 +148,132 @@ def fill_missing_players(ranking_data, target_jobs, current_count_by_job, failed
 
 def create_user_ocid_table(date=None, api_key=None):
     """
-    도장 랭킹 JSON에서 점유율 높은 세부직업 5개의 상위 30명씩 OCID 조회
-    실패 마스터 리스트 제외하고, 직업군별 30개를 보장
+    DW 랭킹 데이터에서 점유율 높은 세부직업 5개의 상위 30명씩 OCID 조회.
+    실패 마스터 DB를 제외하고, 직업군별 30개를 보장한 뒤 stage 테이블에 저장.
     """
     if date is None:
         date = DATE
-    
-    # 실패 마스터 파일 로드
-    failed_set = load_failed_master()
-    print(f"실패 마스터 리스트 로드: {len(failed_set)}개 캐릭터 제외")
-    
-    # 랭킹 JSON 파일 읽기
-    ranking_file = f"data_json/dojang_ranking_{date}.json"
-    
+
+    conn = get_dw_connection()
+    ensure_dw_schema(conn)
     try:
-        with open(ranking_file, 'r', encoding='utf-8') as f:
-            ranking_data = json.load(f)
-        
-        print(f"랭킹 파일 로드 완료: 총 {len(ranking_data)}명")
-    except FileNotFoundError:
-        print(f"랭킹 파일을 찾을 수 없습니다: {ranking_file}")
-        return None
-    
-    # 세부직업별 점유율 분석
-    top_jobs = analyze_job_distribution(ranking_data)
-    
-    # 상위 직업별로 상위 30명씩 선별 (실패 리스트 제외)
-    selected_players = get_top_players_by_job(ranking_data, top_jobs, 30, failed_set)
-    
-    print(f"\n총 {len(selected_players)}명의 플레이어 선별 완료")
-    
-    # 직업별로 그룹화하여 OCID 조회
-    user_ocid_list = []
-    failed_list = []
-    consecutive_errors = 0
-    max_consecutive_errors = 5
-    
-    # 직업별로 처리하여 각 직업군당 30개 보장
-    for job in top_jobs:
-        print(f"\n=== {job} 직업군 처리 시작 ===")
-        job_players = [p for p in selected_players if 
-                      (p.get('세부직업', '').strip() or p.get('직업군', '').strip()) == job]
-        
-        job_success_count = 0
-        job_failed_chars = []
-        
-        for idx, player in enumerate(job_players):
-            character_name = player['캐릭터명']
-            sub_job = player.get('세부직업', player.get('직업군', ''))
-            
-            print(f"처리 중... ({idx+1}/{len(job_players)}) {character_name} ({sub_job})")
-            
-            # OCID 조회
-            ocid = get_character_ocid(character_name, api_key)
-            
-            if ocid:
-                # 세부직업이 없으면 직업군 사용
-                sub_job = player.get('세부직업', '').strip()
-                if not sub_job or sub_job == '':
-                    sub_job = player.get('직업군', '').strip()
-                    
-                user_ocid_list.append({
-                    'character_name': character_name,
-                    'ocid': ocid,
-                    'sub_job': sub_job,
-                    'world': player['월드'],
-                    'level': player['레벨'],
-                    'dojang_floor': player['도장층수']
-                })
-                job_success_count += 1
-                consecutive_errors = 0  # 성공시 연속 에러 카운트 리셋
-            else:
-                print(f"OCID 조회 실패: {character_name}")
-                job_failed_chars.append(character_name)
-                failed_list.append({'index': idx, 'character_name': character_name, 'data': player})
-                consecutive_errors += 1
-                
-                # 연속 에러가 5건 이상이면 중단
-                if consecutive_errors >= max_consecutive_errors:
-                    print(f"\n연속 {max_consecutive_errors}건 에러 발생. 조회를 중단합니다.")
-                    break
-            
-            # API 호출 제한 방지를 위한 딜레이 (초당 5건 제한)
-            time.sleep(0.3)
-        
-        # 직업군별로 30개 미만이면 추가로 채우기
-        if job_success_count < 30:
-            needed = 30 - job_success_count
-            print(f"\n{job}: {job_success_count}명만 성공, {needed}명 추가 필요")
-            
-            # 추가 플레이어 선별 (실패 리스트 + 이미 실패한 캐릭터 제외)
-            current_failed_set = failed_set | set(job_failed_chars)
-            additional_players = fill_missing_players(
-                ranking_data, [job], {job: job_success_count}, current_failed_set, 30
-            )
-            
-            # 추가 플레이어 OCID 조회
-            for player in additional_players:
+        failed_set = load_failed_master_from_db(conn)
+        print(f"실패 마스터 DB 로드: {len(failed_set)}개 캐릭터 제외")
+
+        ranking_data = fetch_rank_records_for_date(conn, date)
+        if not ranking_data:
+            print(f"dw.dw_rank에서 날짜 {date} 데이터를 찾지 못했습니다.")
+            return None
+        print(f"랭킹 데이터 로드 완료(DB): 총 {len(ranking_data)}명")
+
+        top_jobs = analyze_job_distribution(ranking_data)
+        selected_players = get_top_players_by_job(ranking_data, top_jobs, 30, failed_set)
+        print(f"\n총 {len(selected_players)}명의 플레이어 선별 완료")
+
+        user_ocid_list = []
+        failed_list = []
+        consecutive_errors = 0
+        max_consecutive_errors = 5
+
+        for job in top_jobs:
+            print(f"\n=== {job} 직업군 처리 시작 ===")
+            job_players = [
+                p for p in selected_players
+                if (p.get('세부직업', '').strip() or p.get('직업군', '').strip()) == job
+            ]
+
+            job_success_count = 0
+            job_failed_chars = []
+
+            for idx, player in enumerate(job_players):
                 character_name = player['캐릭터명']
-                print(f"추가 조회: {character_name}")
-                
+                sub_job = player.get('세부직업', player.get('직업군', ''))
+
+                print(f"처리 중... ({idx+1}/{len(job_players)}) {character_name} ({sub_job})")
                 ocid = get_character_ocid(character_name, api_key)
+
                 if ocid:
-                    sub_job = player.get('세부직업', '').strip()
-                    if not sub_job or sub_job == '':
-                        sub_job = player.get('직업군', '').strip()
-                    
-                    user_ocid_list.append({
-                        'character_name': character_name,
-                        'ocid': ocid,
-                        'sub_job': sub_job,
-                        'world': player['월드'],
-                        'level': player['레벨'],
-                        'dojang_floor': player['도장층수']
-                    })
+                    sub_job = get_job_name(player)
+                    user_ocid_list.append(
+                        {
+                            'character_name': character_name,
+                            'ocid': ocid,
+                            'sub_job': sub_job,
+                            'world': player['월드'],
+                            'level': player['레벨'],
+                            'dojang_floor': player['도장층수'],
+                        }
+                    )
                     job_success_count += 1
+                    consecutive_errors = 0
                 else:
+                    print(f"OCID 조회 실패: {character_name}")
                     job_failed_chars.append(character_name)
-                    failed_list.append({'character_name': character_name, 'data': player})
-                
+                    failed_list.append({'index': idx, 'character_name': character_name, 'data': player})
+                    consecutive_errors += 1
+                    if consecutive_errors >= max_consecutive_errors:
+                        print(f"\n연속 {max_consecutive_errors}건 에러 발생. 조회를 중단합니다.")
+                        break
+
                 time.sleep(0.3)
-            
-            print(f"{job}: 최종 {job_success_count}명 수집 완료")
-    
-    # 실패한 캐릭터들을 마스터 파일에 추가
-    if failed_list:
-        new_failed_chars = set(item['character_name'] for item in failed_list)
-        failed_set.update(new_failed_chars)
-        save_failed_master(failed_set)
-        print(f"\n{len(new_failed_chars)}개 새로운 실패 캐릭터를 마스터 파일에 추가")
-    
-    # JSON으로 저장
-    if user_ocid_list:
-        output_file = f"data_json/user_ocid_{date}.json"
-        with open(output_file, 'w', encoding='utf-8') as f:
-            json.dump(user_ocid_list, f, ensure_ascii=False, indent=2)
-        print(f"\n유저 마스터 테이블 저장 완료: {output_file}")
+
+            if job_success_count < 30:
+                needed = 30 - job_success_count
+                print(f"\n{job}: {job_success_count}명만 성공, {needed}명 추가 필요")
+                current_failed_set = failed_set | set(job_failed_chars)
+                additional_players = fill_missing_players(
+                    ranking_data, [job], {job: job_success_count}, current_failed_set, 30
+                )
+
+                for player in additional_players:
+                    character_name = player['캐릭터명']
+                    print(f"추가 조회: {character_name}")
+                    ocid = get_character_ocid(character_name, api_key)
+                    if ocid:
+                        sub_job = get_job_name(player)
+                        user_ocid_list.append(
+                            {
+                                'character_name': character_name,
+                                'ocid': ocid,
+                                'sub_job': sub_job,
+                                'world': player['월드'],
+                                'level': player['레벨'],
+                                'dojang_floor': player['도장층수'],
+                            }
+                        )
+                        job_success_count += 1
+                    else:
+                        job_failed_chars.append(character_name)
+                        failed_list.append({'character_name': character_name, 'data': player})
+                    time.sleep(0.3)
+
+                print(f"{job}: 최종 {job_success_count}명 수집 완료")
+
+        if failed_list:
+            new_failed_chars = set(item['character_name'] for item in failed_list)
+            upsert_failed_master_to_db(conn, new_failed_chars, reason="ocid_lookup_failed")
+            print(f"\n{len(new_failed_chars)}개 실패 캐릭터를 실패 마스터 DB에 반영")
+
+        if not user_ocid_list:
+            print("수집된 유저 정보가 없습니다.")
+            return None
+
+        upsert_stage_user_ocid(conn, date, user_ocid_list)
+        print(f"\n유저 마스터(stage_user_ocid) upsert 완료: date={date}")
         print(f"총 {len(user_ocid_list)}명의 유저 정보 수집")
-        
-        # 직업별 수집 현황 출력
+
         job_summary = {}
         for user in user_ocid_list:
             job = user['sub_job']
             job_summary[job] = job_summary.get(job, 0) + 1
-        
+
         print("\n=== 직업별 수집 현황 ===")
         for job, count in job_summary.items():
             print(f"{job}: {count}명")
-        
-        return output_file
-    else:
-        print("수집된 유저 정보가 없습니다.")
-        return None
+
+        return user_ocid_list
+    finally:
+        conn.close()
 
 if __name__ == "__main__":
     create_user_ocid_table()

@@ -1,20 +1,20 @@
 import requests
 import pandas as pd
-import json
 import time
 import sys
 import os
 
 # 상위 디렉토리의 config 모듈 import를 위한 경로 추가
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from config import API_KEY, DATE
+from config import DATE, resolve_api_key
+from dw_load_utils import ensure_dw_schema, get_dw_connection, parse_rank_records, upsert_rank
 
 def get_dojang_ranking_all_pages(date, world_name, api_key=None):
     """
     특정 서버의 도장 랭킹을 1~5페이지까지 조회하여 통합
     """
     if api_key is None:
-        from config import API_KEY as api_key
+        api_key = resolve_api_key("API_KEY_2")
     
     headers = {
         "x-nxopen-api-key": api_key
@@ -113,14 +113,9 @@ def create_dojang_table(json_data, date):
         lambda x: f"{x//60}:{x%60:02d}"
     )
 
-    # JSON으로 저장
     json_data_to_save = df_korean.to_dict('records')
-    output_path = f"data_json/dojang_ranking_{date}.json"
-    with open(output_path, 'w', encoding='utf-8') as f:
-        json.dump(json_data_to_save, f, ensure_ascii=False, indent=2)
-    
-    print(f"총 {len(df_korean)}명의 통합 랭킹 데이터 저장 완료: {output_path}")
-    return df_korean
+    print(f"총 {len(df_korean)}명의 통합 랭킹 데이터 변환 완료")
+    return json_data_to_save
 
 def load_ranker(date=None, api_key=None):
     """
@@ -148,9 +143,16 @@ def load_ranker(date=None, api_key=None):
             # 나중에 알림 연동 시 사용할 수 있도록 로그에 명확히 기록
             # Airflow 로그에서 확인 가능
         
-        # 테이블 생성 및 저장
-        table = create_dojang_table(all_ranking_data, date)
-        return table
+        # 테이블 생성 및 DB upsert
+        rank_records = create_dojang_table(all_ranking_data, date)
+        conn = get_dw_connection()
+        ensure_dw_schema(conn)
+        try:
+            upsert_rank(conn, parse_rank_records(rank_records))
+        finally:
+            conn.close()
+        print(f"dw.dw_rank upsert 완료: {date}, rows={len(rank_records)}")
+        return rank_records
     else:
         print("API 호출 실패 또는 데이터 없음")
         return None
