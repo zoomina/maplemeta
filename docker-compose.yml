@@ -38,6 +38,8 @@ services:
       POSTGRES_USER: airflow
       POSTGRES_PASSWORD: airflow
       POSTGRES_DB: airflow
+      TZ: Asia/Seoul
+    command: ["postgres", "-c", "timezone=Asia/Seoul"]
     volumes:
       - postgres-db-volume:/var/lib/postgresql/data
     healthcheck:
