@@ -1,7 +1,8 @@
-import requests
-import time
-import sys
+import json
 import os
+import requests
+import sys
+import time
 
 # 상위 디렉토리의 config 모듈 import를 위한 경로 추가
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -11,9 +12,53 @@ from dw_load_utils import (
     fetch_rank_records_for_date,
     get_dw_connection,
     load_failed_master_from_db,
+    upsert_rank_ocid_by_character,
+    upsert_api_retry_queue,
     upsert_failed_master_to_db,
     upsert_stage_user_ocid,
 )
+
+PAYLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data_json", "_airflow_payloads")
+
+API_ERROR_CATALOG = {
+    "OPENAPI00001": {"http_status": 500, "response_name": "Internal Server Error", "description": "Internal server error"},
+    "OPENAPI00002": {"http_status": 403, "response_name": "Forbidden", "description": "Unauthorized access"},
+    "OPENAPI00003": {"http_status": 400, "response_name": "Bad Request", "description": "Invalid identifier"},
+    "OPENAPI00004": {"http_status": 400, "response_name": "Bad Request", "description": "Missing or invalid parameter"},
+    "OPENAPI00005": {"http_status": 400, "response_name": "Bad Request", "description": "Invalid API key"},
+    "OPENAPI00006": {"http_status": 400, "response_name": "Bad Request", "description": "Invalid game or API path"},
+    "OPENAPI00007": {"http_status": 429, "response_name": "Too Many Requests", "description": "API call limit exceeded"},
+    "OPENAPI00009": {"http_status": 400, "response_name": "Bad Request", "description": "Data being prepared"},
+    "OPENAPI00010": {"http_status": 400, "response_name": "Bad Request", "description": "Service under maintenance"},
+    "OPENAPI00011": {"http_status": 503, "response_name": "Service Unavailable", "description": "API under maintenance"},
+}
+
+
+def _extract_api_error(response):
+    try:
+        body = response.json()
+    except Exception:
+        body = {"raw_text": response.text[:500] if response.text else None}
+
+    error_obj = body.get("error") if isinstance(body, dict) else None
+    error_code = None
+    error_message = None
+    if isinstance(error_obj, dict):
+        error_code = error_obj.get("name")
+        error_message = error_obj.get("message")
+    if not error_code and isinstance(body, dict):
+        error_code = body.get("error_code") or body.get("name")
+    if not error_message and isinstance(body, dict):
+        error_message = body.get("error_message") or body.get("message")
+
+    catalog = API_ERROR_CATALOG.get(error_code, {})
+    return {
+        "http_status": response.status_code,
+        "error_code": error_code,
+        "error_name": catalog.get("response_name") or response.reason,
+        "error_message": error_message or catalog.get("description") or "unknown_api_error",
+        "api_response_body": body,
+    }
 
 def get_character_ocid(character_name, api_key=None):
     """
@@ -33,14 +78,24 @@ def get_character_ocid(character_name, api_key=None):
         
         if response.status_code == 200:
             data = response.json()
-            return data.get('ocid', None)
+            return data.get('ocid', None), None
         else:
-            print(f"OCID 조회 실패 - {character_name}: Status {response.status_code}")
-            return None
+            api_error = _extract_api_error(response)
+            print(
+                f"OCID 조회 실패 - {character_name}: "
+                f"Status {api_error['http_status']}, code={api_error['error_code']}, msg={api_error['error_message']}"
+            )
+            return None, api_error
             
     except Exception as e:
         print(f"OCID 조회 오류 - {character_name}: {e}")
-        return None
+        return None, {
+            "http_status": None,
+            "error_code": "REQUEST_EXCEPTION",
+            "error_name": "Request Exception",
+            "error_message": str(e),
+            "api_response_body": None,
+        }
 
 def analyze_job_distribution(ranking_data):
     """
@@ -146,10 +201,20 @@ def fill_missing_players(ranking_data, target_jobs, current_count_by_job, failed
     
     return additional_players
 
-def create_user_ocid_table(date=None, api_key=None):
+def _ensure_payload_dir():
+    os.makedirs(PAYLOAD_DIR, exist_ok=True)
+
+
+def _payload_file_path(prefix: str, date: str, run_id: str = None) -> str:
+    safe_run_id = (run_id or "manual").replace(":", "_").replace("/", "_")
+    _ensure_payload_dir()
+    return os.path.join(PAYLOAD_DIR, f"{prefix}_{date}_{safe_run_id}.json")
+
+
+def collect_user_ocid_data(date=None, api_key=None):
     """
-    DW 랭킹 데이터에서 점유율 높은 세부직업 5개의 상위 30명씩 OCID 조회.
-    실패 마스터 DB를 제외하고, 직업군별 30개를 보장한 뒤 stage 테이블에 저장.
+    OCID 수집 단계.
+    DB 적재는 하지 않고, 적재에 필요한 페이로드만 반환한다.
     """
     if date is None:
         date = DATE
@@ -172,6 +237,7 @@ def create_user_ocid_table(date=None, api_key=None):
 
         user_ocid_list = []
         failed_list = []
+        retry_items = []
         consecutive_errors = 0
         max_consecutive_errors = 5
 
@@ -190,7 +256,7 @@ def create_user_ocid_table(date=None, api_key=None):
                 sub_job = player.get('세부직업', player.get('직업군', ''))
 
                 print(f"처리 중... ({idx+1}/{len(job_players)}) {character_name} ({sub_job})")
-                ocid = get_character_ocid(character_name, api_key)
+                ocid, api_error = get_character_ocid(character_name, api_key)
 
                 if ocid:
                     sub_job = get_job_name(player)
@@ -200,7 +266,7 @@ def create_user_ocid_table(date=None, api_key=None):
                             'ocid': ocid,
                             'sub_job': sub_job,
                             'world': player['월드'],
-                            'level': player['레벨'],
+                            'level': player.get('레벨'),
                             'dojang_floor': player['도장층수'],
                         }
                     )
@@ -210,6 +276,19 @@ def create_user_ocid_table(date=None, api_key=None):
                     print(f"OCID 조회 실패: {character_name}")
                     job_failed_chars.append(character_name)
                     failed_list.append({'index': idx, 'character_name': character_name, 'data': player})
+                    retry_items.append(
+                        {
+                            "endpoint": "ocid_lookup",
+                            "target_date": date,
+                            "ocid": f"CHAR:{character_name}",
+                            "character_name": character_name,
+                            "http_status": api_error.get("http_status") if api_error else None,
+                            "error_code": api_error.get("error_code") if api_error else None,
+                            "error_name": api_error.get("error_name") if api_error else None,
+                            "error_message": api_error.get("error_message") if api_error else "unknown_error",
+                            "api_response_body": api_error.get("api_response_body") if api_error else None,
+                        }
+                    )
                     consecutive_errors += 1
                     if consecutive_errors >= max_consecutive_errors:
                         print(f"\n연속 {max_consecutive_errors}건 에러 발생. 조회를 중단합니다.")
@@ -228,7 +307,7 @@ def create_user_ocid_table(date=None, api_key=None):
                 for player in additional_players:
                     character_name = player['캐릭터명']
                     print(f"추가 조회: {character_name}")
-                    ocid = get_character_ocid(character_name, api_key)
+                    ocid, api_error = get_character_ocid(character_name, api_key)
                     if ocid:
                         sub_job = get_job_name(player)
                         user_ocid_list.append(
@@ -237,7 +316,7 @@ def create_user_ocid_table(date=None, api_key=None):
                                 'ocid': ocid,
                                 'sub_job': sub_job,
                                 'world': player['월드'],
-                                'level': player['레벨'],
+                                'level': player.get('레벨'),
                                 'dojang_floor': player['도장층수'],
                             }
                         )
@@ -245,22 +324,22 @@ def create_user_ocid_table(date=None, api_key=None):
                     else:
                         job_failed_chars.append(character_name)
                         failed_list.append({'character_name': character_name, 'data': player})
+                        retry_items.append(
+                            {
+                                "endpoint": "ocid_lookup",
+                                "target_date": date,
+                                "ocid": f"CHAR:{character_name}",
+                                "character_name": character_name,
+                                "http_status": api_error.get("http_status") if api_error else None,
+                                "error_code": api_error.get("error_code") if api_error else None,
+                                "error_name": api_error.get("error_name") if api_error else None,
+                                "error_message": api_error.get("error_message") if api_error else "unknown_error",
+                                "api_response_body": api_error.get("api_response_body") if api_error else None,
+                            }
+                        )
                     time.sleep(0.3)
 
                 print(f"{job}: 최종 {job_success_count}명 수집 완료")
-
-        if failed_list:
-            new_failed_chars = set(item['character_name'] for item in failed_list)
-            upsert_failed_master_to_db(conn, new_failed_chars, reason="ocid_lookup_failed")
-            print(f"\n{len(new_failed_chars)}개 실패 캐릭터를 실패 마스터 DB에 반영")
-
-        if not user_ocid_list:
-            print("수집된 유저 정보가 없습니다.")
-            return None
-
-        upsert_stage_user_ocid(conn, date, user_ocid_list)
-        print(f"\n유저 마스터(stage_user_ocid) upsert 완료: date={date}")
-        print(f"총 {len(user_ocid_list)}명의 유저 정보 수집")
 
         job_summary = {}
         for user in user_ocid_list:
@@ -271,9 +350,71 @@ def create_user_ocid_table(date=None, api_key=None):
         for job, count in job_summary.items():
             print(f"{job}: {count}명")
 
-        return user_ocid_list
+        failed_chars = sorted({item['character_name'] for item in failed_list})
+        return {
+            "date": date,
+            "user_ocid_list": user_ocid_list,
+            "retry_items": retry_items,
+            "failed_characters": failed_chars,
+            "job_summary": job_summary,
+        }
     finally:
         conn.close()
+
+
+def write_ocid_payload(payload: dict, run_id: str = None) -> str:
+    payload_date = payload.get("date") or DATE
+    path = _payload_file_path("ocid_collect", payload_date, run_id)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False)
+    return path
+
+
+def read_ocid_payload(path: str) -> dict:
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def load_user_ocid_payload(payload: dict, retry_delay_hours: int = 3):
+    """
+    OCID 적재 단계.
+    - 실패/재시도 큐 반영
+    - stage -> dw_rank.ocid 반영
+    """
+    date = payload.get("date")
+    users = payload.get("user_ocid_list") or []
+    retry_items = payload.get("retry_items") or []
+    failed_characters = payload.get("failed_characters") or []
+
+    conn = get_dw_connection()
+    ensure_dw_schema(conn)
+    try:
+        if failed_characters:
+            upsert_failed_master_to_db(conn, failed_characters, reason="ocid_lookup_failed")
+            print(f"\n{len(failed_characters)}개 실패 캐릭터를 실패 마스터 DB에 반영")
+        if retry_items:
+            upsert_api_retry_queue(conn, retry_items, retry_delay_hours=retry_delay_hours)
+            print(f"{len(retry_items)}건 재시도 큐 적재")
+
+        if not users:
+            raise RuntimeError(f"[OCID LOAD] 적재 가능한 사용자 데이터가 없습니다. date={date}")
+
+        upsert_stage_user_ocid(conn, date, users)
+        upsert_rank_ocid_by_character(conn, date, users)
+        print(f"\n유저 마스터(stage_user_ocid) upsert 완료: date={date}")
+        print(f"dw.dw_rank OCID 동기화 완료: users={len(users)}")
+        return {"date": date, "loaded_users": len(users)}
+    finally:
+        conn.close()
+
+
+def create_user_ocid_table(date=None, api_key=None):
+    """
+    레거시 호환 함수.
+    수집 + 적재를 한 번에 수행한다.
+    """
+    payload = collect_user_ocid_data(date=date, api_key=api_key)
+    return load_user_ocid_payload(payload, retry_delay_hours=3)
 
 if __name__ == "__main__":
     create_user_ocid_table()

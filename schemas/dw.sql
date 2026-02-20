@@ -7,12 +7,15 @@ create table if not exists dw.dw_rank (
     floor integer,
     record_sec integer,
     character_name text,
+    level integer,
     ocid text,
     job text,
     sub_job text,
     total_rank integer,
     primary key (date, world, world_rank)
 );
+
+alter table dw.dw_rank add column if not exists level integer;
 
 create index if not exists idx_dw_rank_date on dw.dw_rank (date);
 create index if not exists idx_dw_rank_world on dw.dw_rank (world);
@@ -215,3 +218,25 @@ create table if not exists dw.stage_user_ocid (
 
 create index if not exists idx_stage_user_ocid_date on dw.stage_user_ocid (date);
 create index if not exists idx_stage_user_ocid_ocid on dw.stage_user_ocid (ocid);
+
+create table if not exists dw.collect_api_retry_queue (
+    id bigserial primary key,
+    endpoint text not null,
+    target_date date not null,
+    ocid text,
+    character_name text,
+    http_status integer,
+    error_code text,
+    error_name text,
+    error_message text,
+    api_response_body jsonb,
+    retry_count integer not null default 0,
+    status text not null default 'pending',
+    next_retry_at timestamptz not null,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now(),
+    unique (endpoint, target_date, ocid)
+);
+
+create index if not exists idx_collect_api_retry_queue_status_next_retry_at
+on dw.collect_api_retry_queue (status, next_retry_at);

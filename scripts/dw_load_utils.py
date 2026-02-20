@@ -82,6 +82,7 @@ def fetch_rank_records_for_date(conn, date: str) -> List[Dict[str, Any]]:
             floor,
             record_sec,
             character_name,
+            level,
             world,
             job,
             sub_job
@@ -103,9 +104,10 @@ def fetch_rank_records_for_date(conn, date: str) -> List[Dict[str, Any]]:
                 "도장층수": row[3],
                 "기록시간(초)": row[4],
                 "캐릭터명": row[5],
-                "월드": row[6],
-                "직업군": row[7],
-                "세부직업": row[8],
+                "레벨": row[6],
+                "월드": row[7],
+                "직업군": row[8],
+                "세부직업": row[9],
             }
         )
     return results
@@ -161,6 +163,101 @@ def upsert_stage_user_ocid(conn, date: str, users: Sequence[Dict[str, Any]]) -> 
         )
 
     _execute_upsert(conn, "dw.stage_user_ocid", columns, rows, ["date", "character_name"])
+
+
+def upsert_rank_ocid_by_character(conn, date: str, users: Sequence[Dict[str, Any]]) -> None:
+    """
+    날짜+캐릭터명 기준으로 dw.dw_rank.ocid를 동기화한다.
+    OCID 기준 검증을 위해 rank 테이블에도 OCID를 보존한다.
+    """
+    if not users:
+        return
+
+    dedup: Dict[str, str] = {}
+    for user in users:
+        character_name = user.get("character_name")
+        ocid = user.get("ocid")
+        if isinstance(character_name, str) and character_name and isinstance(ocid, str) and ocid:
+            dedup[character_name] = ocid
+
+    if not dedup:
+        return
+
+    rows = [(date, character_name, ocid) for character_name, ocid in dedup.items()]
+    sql = """
+        update dw.dw_rank r
+        set ocid = v.ocid
+        from (values %s) as v(date, character_name, ocid)
+        where r.date = v.date::date
+          and r.character_name = v.character_name
+          and (r.ocid is distinct from v.ocid)
+    """
+    with conn.cursor() as cur:
+        execute_values(cur, sql, rows, page_size=1000)
+    conn.commit()
+
+
+def upsert_api_retry_queue(
+    conn,
+    items: Sequence[Dict[str, Any]],
+    retry_delay_hours: int = 3,
+) -> None:
+    if not items:
+        return
+
+    rows: List[Tuple[Any, ...]] = []
+    for item in items:
+        endpoint = item.get("endpoint")
+        target_date = item.get("target_date")
+        ocid = item.get("ocid")
+        if not endpoint or not target_date or not ocid:
+            continue
+        next_retry_at = item.get("next_retry_at") or datetime.utcnow()
+        rows.append(
+            (
+                endpoint,
+                target_date,
+                ocid,
+                item.get("character_name"),
+                _parse_int(item.get("http_status")),
+                item.get("error_code"),
+                item.get("error_name"),
+                item.get("error_message"),
+                _to_json(item.get("api_response_body")),
+                _parse_int(item.get("retry_count")) or 0,
+                "pending",
+                next_retry_at,
+                datetime.utcnow(),
+            )
+        )
+
+    if not rows:
+        return
+
+    sql = f"""
+        insert into dw.collect_api_retry_queue (
+            endpoint, target_date, ocid, character_name,
+            http_status, error_code, error_name, error_message, api_response_body,
+            retry_count, status, next_retry_at, updated_at
+        )
+        values %s
+        on conflict (endpoint, target_date, ocid)
+        do update set
+            character_name = excluded.character_name,
+            http_status = excluded.http_status,
+            error_code = excluded.error_code,
+            error_name = excluded.error_name,
+            error_message = excluded.error_message,
+            api_response_body = excluded.api_response_body,
+            retry_count = dw.collect_api_retry_queue.retry_count + 1,
+            status = 'pending',
+            next_retry_at = now() + interval '{int(retry_delay_hours)} hour',
+            updated_at = now()
+    """
+
+    with conn.cursor() as cur:
+        execute_values(cur, sql, rows, page_size=1000)
+    conn.commit()
 
 
 def fetch_stage_user_ocid(conn, date: str) -> List[Dict[str, Any]]:
@@ -310,6 +407,7 @@ def parse_rank_records(data: List[Dict[str, Any]]) -> List[Tuple[Any, ...]]:
                 _parse_int(item.get("도장층수")),
                 _parse_int(item.get("기록시간(초)")),
                 item.get("캐릭터명"),
+                _parse_int(item.get("레벨")),
                 None,
                 item.get("직업군"),
                 item.get("세부직업"),
@@ -387,11 +485,26 @@ def parse_ability_records(data: List[Dict[str, Any]]) -> List[Tuple[Any, ...]]:
 
 def parse_hexacore_records(data: List[Dict[str, Any]]) -> List[Tuple[Any, ...]]:
     rows = []
+    cutoff_date = "2025-06-18"
     for item in data:
         date = item.get("date")
         ocid = item.get("ocid")
         character_name = item.get("character_name")
         cores = item.get("character_hexa_core_equipment") or []
+        if not cores and date and str(date) <= cutoff_date:
+            # 빈 payload도 date+ocid 단위 완료 상태로 기록
+            rows.append(
+                (
+                    date,
+                    ocid,
+                    character_name,
+                    "__NO_HEXACORE__",
+                    None,
+                    None,
+                    None,
+                )
+            )
+            continue
         for core in cores:
             rows.append(
                 (
@@ -409,11 +522,26 @@ def parse_hexacore_records(data: List[Dict[str, Any]]) -> List[Tuple[Any, ...]]:
 
 def parse_seteffect_records(data: List[Dict[str, Any]]) -> List[Tuple[Any, ...]]:
     rows = []
+    cutoff_date = "2025-06-18"
     for item in data:
         date = item.get("date")
         ocid = item.get("ocid")
         character_name = item.get("character_name")
         effects = item.get("set_effect") or []
+        if not effects and date and str(date) <= cutoff_date:
+            # 빈 payload도 date+ocid 단위 완료 상태로 기록
+            rows.append(
+                (
+                    date,
+                    ocid,
+                    character_name,
+                    "__NO_SET_EFFECT__",
+                    None,
+                    None,
+                    None,
+                )
+            )
+            continue
         for effect in effects:
             rows.append(
                 (
@@ -456,10 +584,12 @@ def _extract_item_total_option(item: Dict[str, Any]) -> Dict[str, Optional[int]]
 
 def parse_equipment_records(data: List[Dict[str, Any]]) -> List[Tuple[Any, ...]]:
     rows = []
+    cutoff_date = "2025-06-18"
     for entry in data:
         date = entry.get("date")
         ocid = entry.get("ocid")
         character_name = entry.get("character_name")
+        entry_row_count = 0
 
         for key, items in entry.items():
             if not key.startswith("item_equipment"):
@@ -534,6 +664,10 @@ def parse_equipment_records(data: List[Dict[str, Any]]) -> List[Tuple[Any, ...]]
                         total.get("max_mp_rate"),
                     )
                 )
+                entry_row_count += 1
+        if entry_row_count == 0 and date and str(date) <= cutoff_date:
+            # 빈 payload도 date+ocid 단위 완료 상태로 기록
+            rows.append((date, ocid, character_name, "__NO_EQUIPMENT__", "__NO_EQUIPMENT_SLOT__", *([None] * 55)))
     return rows
 
 
@@ -662,6 +796,7 @@ def upsert_rank(conn, rows: Sequence[Sequence[Any]]) -> None:
         "floor",
         "record_sec",
         "character_name",
+        "level",
         "ocid",
         "job",
         "sub_job",
