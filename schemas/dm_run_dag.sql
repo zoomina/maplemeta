@@ -1,3 +1,8 @@
--- DAG run query (single aggregate date)
--- Replace {{ ds }} with execution date when running manually.
-select dm.refresh_marts(array[date '{{ ds }}']);
+-- 샘플: 단일 버전 실행 템플릿
+-- 운영 플로우 생성 전, 수동 실행 시 날짜 배열만 교체해 사용.
+select dm.refresh_dashboard_dm(
+    p_version => '12410',
+    p_update_date => date '2025-12-18',
+    p_character_dates => array[date '2025-12-24', date '2025-12-31'],
+    p_agg_dates => array[date '2025-12-10', date '2025-12-17', date '2025-12-24', date '2025-12-31']
+);
