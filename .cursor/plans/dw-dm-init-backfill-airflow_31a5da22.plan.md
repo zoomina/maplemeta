@@ -60,6 +60,8 @@ isProject: false
   - line 수는 null 아닌 개수
 - `version` 값은 이번 샘플 구간에서 `12410` 사용
   - 이후 업데이트 DB 연동은 별도 플로우에서 확장
+- `dm_rank` 필드 확장
+  - `character_level` 컬럼을 추가하고 `dw_rank.level`을 그대로 적재
 
 ## 반영 완료 사항
 
@@ -113,7 +115,8 @@ function load_dm_rank(version, dates_character):
   src rank rows for dates_character
   enrich with character_master (group/type)
   compute sec_per_floor = record_sec / nullif(floor,0)
-  insert into dm_rank(version,date,character_name,floor,clear_time,sec_per_floor,job,group,type)
+  map character_level = dw_rank.level
+  insert into dm_rank(version,date,character_name,character_level,floor,clear_time,sec_per_floor,job,group,type)
 
 function load_dm_force(version, dates_character):
   source rank + equipment + hyperstat + hexacore
