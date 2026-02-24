@@ -30,6 +30,7 @@ create table if not exists dm.dm_rank (
     version text not null,
     dt date not null,
     character_name text not null,
+    character_level integer,
     floor integer,
     clear_time integer,
     sec_floor numeric(18, 6),
@@ -38,6 +39,8 @@ create table if not exists dm.dm_rank (
     type text,
     primary key (version, dt, character_name)
 );
+
+alter table dm.dm_rank add column if not exists character_level integer;
 
 create index if not exists idx_dm_rank_dt on dm.dm_rank (dt);
 create index if not exists idx_dm_rank_job on dm.dm_rank (job);
@@ -130,6 +133,44 @@ as $$
         end as value;
 $$;
 
+create or replace function dm.resolve_job(p_sub_job text, p_job text)
+returns text
+language sql
+immutable
+as $$
+    select coalesce(nullif(p_sub_job, ''), p_job);
+$$;
+
+create or replace function dm.segment_label(p_floor integer, p_top90_cnt bigint)
+returns text
+language sql
+immutable
+as $$
+    select
+        case
+            when p_floor between 50 and 69 then '50층'
+            when p_floor >= 90 then '상위권'
+            when p_floor >= 80 and coalesce(p_top90_cnt, 0) < 15 then '상위권'
+            else null
+        end;
+$$;
+
+create or replace function dm.normalize_ability_text(p_text text)
+returns text
+language sql
+immutable
+as $$
+    select btrim(
+        regexp_replace(
+            regexp_replace(
+                regexp_replace(coalesce(p_text, ''), '[0-9]+(?:\\.[0-9]+)?%?', '', 'g'),
+                '[+=:/,()\\[\\]~]', ' ', 'g'
+            ),
+            '[[:space:]]+', ' ', 'g'
+        )
+    );
+$$;
+
 create or replace function dm.refresh_dashboard_dm(
     p_version text,
     p_update_date date,
@@ -140,6 +181,9 @@ returns void
 language plpgsql
 as $$
 begin
+    -- -----------------------------------------------------------------
+    -- 0) Guard clauses / idempotent delete
+    -- -----------------------------------------------------------------
     if p_version is null or btrim(p_version) = '' then
         raise exception 'p_version must not be empty';
     end if;
@@ -171,116 +215,62 @@ begin
 
     insert into dm.character_master (job, "group", type, img, color)
     values
-        ('카인', '노바', '궁수', 'https://lwi.nexon.com/maplestory/guide/char_info/char29.png', null),
-        ('와일드헌터', '레지스탕스', '궁수', 'https://lwi.nexon.com/maplestory/guide/char_info/char27.png', null),
-        ('보우마스터', '모험가', '궁수', 'https://lwi.nexon.com/maplestory/guide/char_info/char23.png', null),
-        ('신궁', '모험가', '궁수', 'https://lwi.nexon.com/maplestory/guide/char_info/char24.png', null),
-        ('패스파인더', '모험가', '궁수', 'https://lwi.nexon.com/maplestory/guide/char_info/char25.png', null),
-        ('윈드브레이커', '시그너스 기사단', '궁수', 'https://lwi.nexon.com/maplestory/guide/char_info/char26.png', null),
-        ('메르세데스', '영웅', '궁수', 'https://lwi.nexon.com/maplestory/guide/char_info/char28.png', null),
-        ('카데나', '노바', '도적', 'https://lwi.nexon.com/maplestory/guide/char_info/char36.png', null),
-        ('칼리', '레프', '도적', 'https://lwi.nexon.com/maplestory/guide/char_info/char37.png', null),
-        ('나이트로드', '모험가', '도적', 'https://lwi.nexon.com/maplestory/guide/char_info/char30.png', null),
-        ('섀도어', '모험가', '도적', 'https://lwi.nexon.com/maplestory/guide/char_info/char31.png', null),
-        ('듀얼블레이더', '모험가', '도적', 'https://lwi.nexon.com/maplestory/guide/char_info/char32.png', null),
-        ('나이트워커', '시그너스 기사단', '도적', 'https://lwi.nexon.com/maplestory/guide/char_info/char33.png', null),
-        ('호영', '아니마', '도적', 'https://lwi.nexon.com/maplestory/guide/char_info/char38.png', null),
-        ('팬텀', '영웅', '도적', 'https://lwi.nexon.com/maplestory/guide/char_info/char35.png', null),
-        ('제논', '레지스탕스', '도적/해적', 'https://lwi.nexon.com/maplestory/guide/char_info/char34.png', null),
-        ('배틀메이지', '레지스탕스', '마법사', 'https://lwi.nexon.com/maplestory/guide/char_info/char17.png', null),
-        ('일리움', '레프', '마법사', 'https://lwi.nexon.com/maplestory/guide/char_info/char20.png', null),
-        ('비숍', '모험가', '마법사', 'https://lwi.nexon.com/maplestory/guide/char_info/char15.png', null),
-        ('아크메이지(썬,콜)', '모험가', '마법사', 'https://lwi.nexon.com/maplestory/guide/char_info/char14.png', null),
-        ('아크메이지(불,독)', '모험가', '마법사', 'https://lwi.nexon.com/maplestory/guide/char_info/char13.png', null),
-        ('플레임위자드', '시그너스 기사단', '마법사', 'https://lwi.nexon.com/maplestory/guide/char_info/char16.png', null),
-        ('라라', '아니마', '마법사', 'https://lwi.nexon.com/maplestory/guide/char_info/char21.png', null),
-        ('루미너스', '영웅', '마법사', 'https://lwi.nexon.com/maplestory/guide/char_info/char19.png', null),
-        ('에반', '영웅', '마법사', 'https://lwi.nexon.com/maplestory/guide/char_info/char18.png', null),
-        ('키네시스', '프렌즈 월드', '마법사', 'https://lwi.nexon.com/maplestory/guide/char_info/char22.png', null),
-        ('카이저', '노바', '전사', 'https://lwi.nexon.com/maplestory/guide/char_info/char10.png', null),
-        ('데몬어벤져', '레지스탕스', '전사', 'https://lwi.nexon.com/maplestory/guide/char_info/char8.png', null),
-        ('데몬슬레이어', '레지스탕스', '전사', 'https://lwi.nexon.com/maplestory/guide/char_info/char7.png', null),
-        ('블래스터', '레지스탕스', '전사', 'https://lwi.nexon.com/maplestory/guide/char_info/char6.png', null),
-        ('아델', '레프', '전사', 'https://lwi.nexon.com/maplestory/guide/char_info/char11.png', null),
-        ('히어로', '모험가', '전사', 'https://lwi.nexon.com/maplestory/guide/char_info/char1.png', null),
-        ('팔라딘', '모험가', '전사', 'https://lwi.nexon.com/maplestory/guide/char_info/char2.png', null),
-        ('다크나이트', '모험가', '전사', 'https://lwi.nexon.com/maplestory/guide/char_info/char3.png', null),
-        ('소울마스터', '시그너스 기사단', '전사', 'https://lwi.nexon.com/maplestory/guide/char_info/char4.png', null),
-        ('미하일', '시그너스 기사단', '전사', 'https://lwi.nexon.com/maplestory/guide/char_info/char5.png', null),
-        ('렌', '아니마', '전사', 'https://lwi.nexon.com/maplestory/guide/char_info/char48.png', null),
-        ('아란', '영웅', '전사', 'https://lwi.nexon.com/maplestory/guide/char_info/char9.png', null),
-        ('제로', '초월자', '전사', 'https://lwi.nexon.com/maplestory/guide/char_info/char12.png', null),
-        ('엔젤릭버스터', '노바', '해적', 'https://lwi.nexon.com/maplestory/guide/char_info/char46.png', null),
-        ('메카닉', '레지스탕스', '해적', 'https://lwi.nexon.com/maplestory/guide/char_info/char43.png', null),
-        ('아크', '레프', '해적', 'https://lwi.nexon.com/maplestory/guide/char_info/char47.png', null),
-        ('바이퍼', '모험가', '해적', 'https://lwi.nexon.com/maplestory/guide/char_info/char39.png', null),
-        ('캡틴', '모험가', '해적', 'https://lwi.nexon.com/maplestory/guide/char_info/char40.png', null),
-        ('캐논슈터', '모험가', '해적', 'https://lwi.nexon.com/maplestory/guide/char_info/char41.png', null),
-        ('스트라이커', '시그너스 기사단', '해적', 'https://lwi.nexon.com/maplestory/guide/char_info/char42.png', null),
-        ('은월', '영웅', '해적', 'https://lwi.nexon.com/maplestory/guide/char_info/char45.png', null)
+        ('카인', '노바', '궁수', 'https://lwi.nexon.com/maplestory/guide/char_info/char29.png', '#0B1F3A'),
+        ('와일드헌터', '레지스탕스', '궁수', 'https://lwi.nexon.com/maplestory/guide/char_info/char27.png', '#2E7D32'),
+        ('보우마스터', '모험가', '궁수', 'https://lwi.nexon.com/maplestory/guide/char_info/char23.png', '#2E7D32'),
+        ('신궁', '모험가', '궁수', 'https://lwi.nexon.com/maplestory/guide/char_info/char24.png', '#1B5E20'),
+        ('패스파인더', '모험가', '궁수', 'https://lwi.nexon.com/maplestory/guide/char_info/char25.png', '#00897B'),
+        ('윈드브레이커', '시그너스 기사단', '궁수', 'https://lwi.nexon.com/maplestory/guide/char_info/char26.png', '#00A86B'),
+        ('메르세데스', '영웅', '궁수', 'https://lwi.nexon.com/maplestory/guide/char_info/char28.png', '#66BB6A'),
+        ('카데나', '노바', '도적', 'https://lwi.nexon.com/maplestory/guide/char_info/char36.png', '#3B0A45'),
+        ('칼리', '레프', '도적', 'https://lwi.nexon.com/maplestory/guide/char_info/char37.png', '#880E4F'),
+        ('나이트로드', '모험가', '도적', 'https://lwi.nexon.com/maplestory/guide/char_info/char30.png', '#4A148C'),
+        ('섀도어', '모험가', '도적', 'https://lwi.nexon.com/maplestory/guide/char_info/char31.png', '#311B92'),
+        ('듀얼블레이더', '모험가', '도적', 'https://lwi.nexon.com/maplestory/guide/char_info/char32.png', '#212121'),
+        ('나이트워커', '시그너스 기사단', '도적', 'https://lwi.nexon.com/maplestory/guide/char_info/char33.png', '#1A237E'),
+        ('호영', '아니마', '도적', 'https://lwi.nexon.com/maplestory/guide/char_info/char38.png', '#2E7D32'),
+        ('팬텀', '영웅', '도적', 'https://lwi.nexon.com/maplestory/guide/char_info/char35.png', '#0D47A1'),
+        ('제논', '레지스탕스', '도적/해적', 'https://lwi.nexon.com/maplestory/guide/char_info/char34.png', '#FF4081'),
+        ('배틀메이지', '레지스탕스', '마법사', 'https://lwi.nexon.com/maplestory/guide/char_info/char17.png', '#6A1B9A'),
+        ('일리움', '레프', '마법사', 'https://lwi.nexon.com/maplestory/guide/char_info/char20.png', '#00ACC1'),
+        ('비숍', '모험가', '마법사', 'https://lwi.nexon.com/maplestory/guide/char_info/char15.png', '#7E57C2'),
+        ('아크메이지(썬,콜)', '모험가', '마법사', 'https://lwi.nexon.com/maplestory/guide/char_info/char14.png', '#1565C0'),
+        ('아크메이지(불,독)', '모험가', '마법사', 'https://lwi.nexon.com/maplestory/guide/char_info/char13.png', '#D84315'),
+        ('플레임위자드', '시그너스 기사단', '마법사', 'https://lwi.nexon.com/maplestory/guide/char_info/char16.png', '#E53935'),
+        ('라라', '아니마', '마법사', 'https://lwi.nexon.com/maplestory/guide/char_info/char21.png', '#A5D6A7'),
+        ('루미너스', '영웅', '마법사', 'https://lwi.nexon.com/maplestory/guide/char_info/char19.png', '#B71C1C'),
+        ('에반', '영웅', '마법사', 'https://lwi.nexon.com/maplestory/guide/char_info/char18.png', '#1B5E20'),
+        ('키네시스', '프렌즈 월드', '마법사', 'https://lwi.nexon.com/maplestory/guide/char_info/char22.png', '#AD1457'),
+        ('카이저', '노바', '전사', 'https://lwi.nexon.com/maplestory/guide/char_info/char10.png', '#C62828'),
+        ('데몬어벤져', '레지스탕스', '전사', 'https://lwi.nexon.com/maplestory/guide/char_info/char8.png', '#3E003E'),
+        ('데몬슬레이어', '레지스탕스', '전사', 'https://lwi.nexon.com/maplestory/guide/char_info/char7.png', '#2E0854'),
+        ('블래스터', '레지스탕스', '전사', 'https://lwi.nexon.com/maplestory/guide/char_info/char6.png', '#D32F2F'),
+        ('아델', '레프', '전사', 'https://lwi.nexon.com/maplestory/guide/char_info/char11.png', '#81D4FA'),
+        ('히어로', '모험가', '전사', 'https://lwi.nexon.com/maplestory/guide/char_info/char1.png', '#C62828'),
+        ('팔라딘', '모험가', '전사', 'https://lwi.nexon.com/maplestory/guide/char_info/char2.png', '#E53935'),
+        ('다크나이트', '모험가', '전사', 'https://lwi.nexon.com/maplestory/guide/char_info/char3.png', '#8E0000'),
+        ('소울마스터', '시그너스 기사단', '전사', 'https://lwi.nexon.com/maplestory/guide/char_info/char4.png', '#D4AF37'),
+        ('미하일', '시그너스 기사단', '전사', 'https://lwi.nexon.com/maplestory/guide/char_info/char5.png', '#F9A825'),
+        ('렌', '아니마', '전사', 'https://lwi.nexon.com/maplestory/guide/char_info/char48.png', '#00695C'),
+        ('아란', '영웅', '전사', 'https://lwi.nexon.com/maplestory/guide/char_info/char9.png', '#ECEFF1'),
+        ('제로', '초월자', '전사', 'https://lwi.nexon.com/maplestory/guide/char_info/char12.png', '#90CAF9'),
+        ('엔젤릭버스터', '노바', '해적', 'https://lwi.nexon.com/maplestory/guide/char_info/char46.png', '#FF6EC7'),
+        ('메카닉', '레지스탕스', '해적', 'https://lwi.nexon.com/maplestory/guide/char_info/char43.png', '#455A64'),
+        ('아크', '레프', '해적', 'https://lwi.nexon.com/maplestory/guide/char_info/char47.png', '#4527A0'),
+        ('바이퍼', '모험가', '해적', 'https://lwi.nexon.com/maplestory/guide/char_info/char39.png', '#EF6C00'),
+        ('캡틴', '모험가', '해적', 'https://lwi.nexon.com/maplestory/guide/char_info/char40.png', '#FB8C00'),
+        ('캐논슈터', '모험가', '해적', 'https://lwi.nexon.com/maplestory/guide/char_info/char41.png', '#F4511E'),
+        ('스트라이커', '시그너스 기사단', '해적', 'https://lwi.nexon.com/maplestory/guide/char_info/char42.png', '#1565C0'),
+        ('은월', '영웅', '해적', 'https://lwi.nexon.com/maplestory/guide/char_info/char45.png', '#1976D2')
     on conflict (job) do update set
         "group" = excluded."group",
         type = excluded.type,
         img = excluded.img,
         color = excluded.color;
 
-    update dm.character_master cm
-    set color = case
-        -- 모험가 (직업별)
-        when cm.job = '히어로' then '#C62828'
-        when cm.job = '팔라딘' then '#E53935'
-        when cm.job = '다크나이트' then '#8E0000'
-        when cm.job = '아크메이지(불,독)' then '#D84315'
-        when cm.job = '아크메이지(썬,콜)' then '#1565C0'
-        when cm.job = '비숍' then '#7E57C2'
-        when cm.job = '보우마스터' then '#2E7D32'
-        when cm.job = '신궁' then '#1B5E20'
-        when cm.job = '패스파인더' then '#00897B'
-        when cm.job = '나이트로드' then '#4A148C'
-        when cm.job = '섀도어' then '#311B92'
-        when cm.job = '듀얼블레이더' then '#212121'
-        when cm.job = '바이퍼' then '#EF6C00'
-        when cm.job = '캡틴' then '#FB8C00'
-        when cm.job = '캐논슈터' then '#F4511E'
-        -- 시그너스 기사단
-        when cm.job = '소울마스터' then '#D4AF37'
-        when cm.job = '미하일' then '#F9A825'
-        when cm.job = '플레임위자드' then '#E53935'
-        when cm.job = '윈드브레이커' then '#00A86B'
-        when cm.job = '나이트워커' then '#1A237E'
-        when cm.job = '스트라이커' then '#1565C0'
-        -- 영웅
-        when cm.job = '메르세데스' then '#66BB6A'
-        when cm.job = '루미너스' then '#B71C1C'
-        when cm.job = '팬텀' then '#0D47A1'
-        when cm.job = '아란' then '#ECEFF1'
-        when cm.job = '에반' then '#1B5E20'
-        when cm.job = '은월' then '#1976D2'
-        -- 레지스탕스 / 데몬
-        when cm.job = '배틀메이지' then '#6A1B9A'
-        when cm.job = '와일드헌터' then '#2E7D32'
-        when cm.job = '메카닉' then '#455A64'
-        when cm.job = '제논' then '#FF4081'
-        when cm.job = '블래스터' then '#D32F2F'
-        when cm.job = '데몬슬레이어' then '#2E0854'
-        when cm.job = '데몬어벤져' then '#3E003E'
-        -- 노바
-        when cm.job = '카이저' then '#C62828'
-        when cm.job = '엔젤릭버스터' then '#FF6EC7'
-        when cm.job = '카인' then '#0B1F3A'
-        -- 레프
-        when cm.job = '아델' then '#81D4FA'
-        when cm.job = '일리움' then '#00ACC1'
-        when cm.job = '아크' then '#4527A0'
-        -- 아니마
-        when cm.job = '호영' then '#2E7D32'
-        when cm.job = '라라' then '#A5D6A7'
-        -- 초월자 / 특수
-        when cm.job = '제로' then '#90CAF9'
-        when cm.job = '키네시스' then '#AD1457'
-        when cm.job = '칼리' then '#880E4F'
-        else cm.color
-    end;
+    -- -----------------------------------------------------------------
+    -- 1) Master refresh
+    -- -----------------------------------------------------------------
 
     with src_dates as (
         select distinct unnest(p_character_dates)::date as dt
@@ -291,7 +281,7 @@ begin
         select
             e.item_name as equipment_name,
             e.item_icon as img,
-            coalesce(nullif(r.sub_job, ''), r.job) as job,
+            dm.resolve_job(r.sub_job, r.job) as job,
             cm.type,
             count(*) as use_cnt
         from dw.dw_equipment e
@@ -299,13 +289,13 @@ begin
             on r.date = e.date::date
             and r.ocid = e.ocid
         left join dm.character_master cm
-            on cm.job = coalesce(nullif(r.sub_job, ''), r.job)
+            on cm.job = dm.resolve_job(r.sub_job, r.job)
         join src_dates sd
             on sd.dt = e.date::date
         where e.equipment_list = 'item_equipment'
           and e.item_name is not null
           and btrim(e.item_name) <> ''
-        group by e.item_name, e.item_icon, coalesce(nullif(r.sub_job, ''), r.job), cm.type
+        group by e.item_name, e.item_icon, dm.resolve_job(r.sub_job, r.job), cm.type
     ),
     ranked_usage as (
         select
@@ -340,7 +330,7 @@ begin
         select
             hs.date::date as dt,
             hs.ocid,
-            coalesce(nullif(r.sub_job, ''), r.job) as job,
+            dm.resolve_job(r.sub_job, r.job) as job,
             v.stat_label,
             v.stat_level
         from dw.dw_hyperstat hs
@@ -410,6 +400,9 @@ begin
         hyper3 = excluded.hyper3,
         img = excluded.img;
 
+    -- -----------------------------------------------------------------
+    -- 2) Grain refresh (dm_rank, dm_force)
+    -- -----------------------------------------------------------------
     with char_dates as (
         select distinct unnest(p_character_dates)::date as dt
     ),
@@ -418,9 +411,10 @@ begin
             r.date as dt,
             r.ocid,
             r.character_name,
+            r.level as character_level,
             r.floor,
             r.record_sec as clear_time,
-            coalesce(nullif(r.sub_job, ''), r.job) as job
+            dm.resolve_job(r.sub_job, r.job) as job
         from dw.dw_rank r
         join char_dates cd
             on cd.dt = r.date
@@ -429,6 +423,7 @@ begin
         version,
         dt,
         character_name,
+        character_level,
         floor,
         clear_time,
         sec_floor,
@@ -440,6 +435,7 @@ begin
         p_version as version,
         rs.dt,
         rs.character_name,
+        rs.character_level,
         rs.floor,
         rs.clear_time,
         case
@@ -461,10 +457,10 @@ begin
             r.date as dt,
             r.ocid,
             r.character_name,
-            coalesce(nullif(r.sub_job, ''), r.job) as job,
+            dm.resolve_job(r.sub_job, r.job) as job,
             r.floor,
             count(*) filter (where r.floor >= 90)
-                over (partition by r.date, coalesce(nullif(r.sub_job, ''), r.job)) as top90_cnt
+                over (partition by r.date, dm.resolve_job(r.sub_job, r.job)) as top90_cnt
         from dw.dw_rank r
         join char_dates cd
             on cd.dt = r.date
@@ -475,12 +471,7 @@ begin
             rws.ocid,
             rws.character_name,
             rws.job,
-            case
-                when rws.floor between 50 and 69 then '50층'
-                when rws.floor >= 90 then '상위권'
-                when rws.floor >= 80 and rws.top90_cnt < 15 then '상위권'
-                else null
-            end as segment
+            dm.segment_label(rws.floor, rws.top90_cnt) as segment
         from rank_with_seg rws
     ),
     hexa_sum as (
@@ -700,6 +691,9 @@ begin
     left join lateral dm.split_label_value(wo.potential_option_3) p3 on true
     where s.segment is not null;
 
+    -- -----------------------------------------------------------------
+    -- 3) Aggregate refresh (dm_ability, dm_seedring, dm_equipment)
+    -- -----------------------------------------------------------------
     with agg_dates as (
         select distinct unnest(p_agg_dates)::date as dt
     ),
@@ -707,10 +701,10 @@ begin
         select
             r.date as dt,
             r.ocid,
-            coalesce(nullif(r.sub_job, ''), r.job) as job,
+            dm.resolve_job(r.sub_job, r.job) as job,
             r.floor,
             count(*) filter (where r.floor >= 90)
-                over (partition by r.date, coalesce(nullif(r.sub_job, ''), r.job)) as top90_cnt
+                over (partition by r.date, dm.resolve_job(r.sub_job, r.job)) as top90_cnt
         from dw.dw_rank r
         join agg_dates ad
             on ad.dt = r.date
@@ -720,12 +714,7 @@ begin
             rws.dt,
             rws.ocid,
             rws.job,
-            case
-                when rws.floor between 50 and 69 then '50층'
-                when rws.floor >= 90 then '상위권'
-                when rws.floor >= 80 and rws.top90_cnt < 15 then '상위권'
-                else null
-            end as segment
+            dm.segment_label(rws.floor, rws.top90_cnt) as segment
         from rank_with_seg rws
     ),
     ability_base as (
@@ -767,15 +756,7 @@ begin
             ab.job,
             ab.segment,
             ab.timing,
-            btrim(
-                regexp_replace(
-                    regexp_replace(
-                        regexp_replace(ab.ability, '[0-9]+(?:\\.[0-9]+)?%?', '', 'g'),
-                        '[+=:/,()\\[\\]~]', ' ', 'g'
-                    ),
-                    '[[:space:]]+', ' ', 'g'
-                )
-            ) as ability,
+            dm.normalize_ability_text(ab.ability) as ability,
             ab.grade,
             case
                 when ab.has_boss_text = 1 then 'boss'
@@ -826,10 +807,10 @@ begin
         select
             r.date as dt,
             r.ocid,
-            coalesce(nullif(r.sub_job, ''), r.job) as job,
+            dm.resolve_job(r.sub_job, r.job) as job,
             r.floor,
             count(*) filter (where r.floor >= 90)
-                over (partition by r.date, coalesce(nullif(r.sub_job, ''), r.job)) as top90_cnt
+                over (partition by r.date, dm.resolve_job(r.sub_job, r.job)) as top90_cnt
         from dw.dw_rank r
         join agg_dates ad
             on ad.dt = r.date
@@ -839,12 +820,7 @@ begin
             rws.dt,
             rws.ocid,
             rws.job,
-            case
-                when rws.floor between 50 and 69 then '50층'
-                when rws.floor >= 90 then '상위권'
-                when rws.floor >= 80 and rws.top90_cnt < 15 then '상위권'
-                else null
-            end as segment
+            dm.segment_label(rws.floor, rws.top90_cnt) as segment
         from rank_with_seg rws
     ),
     ring_raw as (
@@ -897,10 +873,10 @@ begin
         select
             r.date as dt,
             r.ocid,
-            coalesce(nullif(r.sub_job, ''), r.job) as job,
+            dm.resolve_job(r.sub_job, r.job) as job,
             r.floor,
             count(*) filter (where r.floor >= 90)
-                over (partition by r.date, coalesce(nullif(r.sub_job, ''), r.job)) as top90_cnt
+                over (partition by r.date, dm.resolve_job(r.sub_job, r.job)) as top90_cnt
         from dw.dw_rank r
         join agg_dates ad
             on ad.dt = r.date
@@ -910,12 +886,7 @@ begin
             rws.dt,
             rws.ocid,
             rws.job,
-            case
-                when rws.floor between 50 and 69 then '50층'
-                when rws.floor >= 90 then '상위권'
-                when rws.floor >= 80 and rws.top90_cnt < 15 then '상위권'
-                else null
-            end as segment
+            dm.segment_label(rws.floor, rws.top90_cnt) as segment
         from rank_with_seg rws
     ),
     equip_raw as (
@@ -925,7 +896,6 @@ begin
             case
                 when e.item_equipment_slot = '무기' then '무기'
                 when e.item_equipment_slot = '보조무기' then '보조무기'
-                when e.item_equipment_part like '%세트%' then '세트효과'
                 else null
             end as type,
             e.item_name as name,
@@ -939,6 +909,33 @@ begin
           and e.item_name is not null
           and btrim(e.item_name) <> ''
     ),
+    seteffect_raw as (
+        select
+            s.job,
+            case when se.date::date < p_update_date then 'pre' else 'post' end as timing,
+            '세트효과'::text as type,
+            se.set_name || ' ' || coalesce(mx.max_set_count, se.total_set_count, 1)::text || '개' as name,
+            s.segment
+        from dw.dw_seteffect se
+        join segged s
+            on s.dt = se.date::date
+            and s.ocid = se.ocid
+        left join lateral (
+            select max((x->>'set_count')::int) as max_set_count
+            from jsonb_array_elements(coalesce(se.set_effect_info, '[]'::jsonb)) x
+        ) mx on true
+        where s.segment is not null
+          and se.set_name is not null
+          and btrim(se.set_name) <> ''
+    ),
+    all_equipment_raw as (
+        select job, timing, type, name, segment
+        from equip_raw
+        where type is not null
+        union all
+        select job, timing, type, name, segment
+        from seteffect_raw
+    ),
     counted as (
         select
             er.job,
@@ -947,8 +944,7 @@ begin
             er.name,
             er.segment,
             count(*)::numeric as cnt
-        from equip_raw er
-        where er.type is not null
+        from all_equipment_raw er
         group by er.job, er.timing, er.type, er.name, er.segment
     )
     insert into dm.dm_equipment (
