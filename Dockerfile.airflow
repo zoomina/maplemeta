@@ -1,0 +1,7 @@
+# Airflow 이미지 확장: nexon_notice DAG용 anthropic 등 프로젝트 의존성 설치
+FROM apache/airflow:2.8.0
+USER root
+COPY requirements.txt /tmp/requirements.txt
+RUN chown airflow:root /tmp/requirements.txt
+USER airflow
+RUN pip install --no-cache-dir -r /tmp/requirements.txt

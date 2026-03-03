@@ -53,9 +53,11 @@ create table dm.dm_rank (
 );
 
 alter table dm.dm_rank add column if not exists character_level integer;
+alter table dm.dm_rank add column if not exists segment text;
 
 create index if not exists idx_dm_rank_date on dm.dm_rank (date);
 create index if not exists idx_dm_rank_job on dm.dm_rank (job);
+create index if not exists idx_dm_rank_segment on dm.dm_rank (segment);
 
 drop table if exists dm.dm_force;
 create table dm.dm_force (
@@ -153,56 +155,8 @@ create table dm.dm_equipment (
     primary key (version, date, job, type, name, segment)
 );
 
-create table if not exists dm.dm_notice (
-    notice_id integer primary key,
-    title text,
-    url text,
-    date timestamptz
-);
-
-create table if not exists dm.dm_event (
-    notice_id integer primary key,
-    title text,
-    url text,
-    date timestamptz,
-    start_date timestamptz,
-    end_date timestamptz,
-    thumbnail text
-);
-
-create table if not exists dm.dm_cashshop (
-    notice_id integer primary key,
-    title text,
-    url text,
-    date timestamptz,
-    start_date timestamptz,
-    end_date timestamptz,
-    thumbnail text
-);
-
-create table if not exists dm.dm_update (
-    notice_id integer primary key,
-    title text,
-    url text,
-    date timestamptz
-);
-
-alter table dm.dm_event add column if not exists thumbnail text;
-alter table dm.dm_cashshop add column if not exists thumbnail text;
-
-create table if not exists dm.version_master (
-    version text primary key,
-    start_date date,
-    end_date date,
-    type text[],
-    impacted_job text[],
-    content_list text[],
-    patch_note text
-);
-
-alter table dm.version_master add column if not exists content_list text[];
-
-create table if not exists dm.dm_hexacore (
+drop table if exists dm.dm_hexacore;
+create table dm.dm_hexacore (
     version text not null,
     date date not null,
     job text not null,
@@ -215,6 +169,41 @@ create table if not exists dm.dm_hexacore (
 );
 
 create index if not exists idx_dm_hexacore_version_date on dm.dm_hexacore (version, date);
+
+-- dm_shift_score: 직업×세그먼트×버전별 Total Shift 점수 (shift_score/엔트로피 계획)
+-- 100점 척도: KPI 카드용 min-max 정규화
+create table if not exists dm.dm_shift_score (
+    version varchar(32) not null,
+    job varchar(64) not null,
+    segment varchar(16) not null,
+    outcome_shift float,
+    stat_shift float,
+    build_shift float,
+    total_shift float not null,
+    direction smallint,
+    outcome_score_100 smallint,
+    stat_score_100 smallint,
+    build_score_100 smallint,
+    total_score_100 smallint,
+    primary key (version, job, segment)
+);
+alter table dm.dm_shift_score add column if not exists outcome_score_100 smallint;
+alter table dm.dm_shift_score add column if not exists stat_score_100 smallint;
+alter table dm.dm_shift_score add column if not exists build_score_100 smallint;
+alter table dm.dm_shift_score add column if not exists total_score_100 smallint;
+
+-- dm_balance_score: 버전×세그먼트별 밸런스 점수(정규화 엔트로피 기반)
+create table if not exists dm.dm_balance_score (
+    version varchar(32) not null,
+    segment varchar(16) not null,
+    balance_score smallint not null,
+    top_job varchar(64),
+    top_share float,
+    cr3 float,
+    top_type varchar(32),
+    top_type_share float,
+    primary key (version, segment)
+);
 
 create or replace function dm.split_label_value(p_text text)
 returns table(label text, value text)
@@ -513,6 +502,22 @@ begin
         union
         select distinct unnest(p_agg_dates)::date as dt
     ),
+    hyper_preset_pick as (
+        select
+            hs.date::date as dt,
+            hs.ocid,
+            hs.preset_no,
+            row_number() over (
+                partition by hs.date::date, hs.ocid
+                order by
+                    coalesce(hs.보스_몬스터_공격_시_데미지_증가_level, 0) desc,
+                    coalesce(hs.remain_point, 2147483647),
+                    hs.preset_no
+            ) as rn
+        from dw.dw_hyperstat hs
+        join src_dates sd
+            on sd.dt = hs.date::date
+    ),
     hyper_unpivot as (
         select
             hs.date::date as dt,
@@ -521,11 +526,14 @@ begin
             v.stat_label,
             v.stat_level
         from dw.dw_hyperstat hs
+        join hyper_preset_pick hp
+            on hp.dt = hs.date::date
+            and hp.ocid = hs.ocid
+            and hp.preset_no = hs.preset_no
+            and hp.rn = 1
         join dw.dw_rank r
             on r.date = hs.date::date
             and r.ocid = hs.ocid
-        join src_dates sd
-            on sd.dt = hs.date::date
         cross join lateral (
             values
                 ('STR', hs.STR_level),
@@ -545,8 +553,7 @@ begin
                 ('크리티컬 확률', hs.크리티컬_확률_level),
                 ('획득 경험치', hs.획득_경험치_level)
         ) as v(stat_label, stat_level)
-        where hs.preset_no = 1
-          and coalesce(v.stat_level, 0) > 0
+        where coalesce(v.stat_level, 0) > 0
     ),
     hyper_ranked as (
         select
@@ -596,7 +603,7 @@ begin
     with char_dates as (
         select distinct unnest(p_character_dates)::date as dt
     ),
-    rank_src as (
+    rank_with_seg as (
         select
             r.date as dt,
             r.ocid,
@@ -604,7 +611,9 @@ begin
             r.level as character_level,
             r.floor,
             r.record_sec as clear_time,
-            dm.resolve_job(r.sub_job, r.job) as job
+            dm.resolve_job(r.sub_job, r.job) as job,
+            count(*) filter (where r.floor >= 90)
+                over (partition by r.date, dm.resolve_job(r.sub_job, r.job)) as top90_cnt
         from dw.dw_rank r
         join char_dates cd
             on cd.dt = r.date
@@ -619,25 +628,27 @@ begin
         sec_floor,
         job,
         "group",
-        type
+        type,
+        segment
     )
     select
         p_version as version,
-        rs.dt as date,
-        rs.character_name,
-        rs.character_level,
-        rs.floor,
-        rs.clear_time,
+        rws.dt as date,
+        rws.character_name,
+        rws.character_level,
+        rws.floor,
+        rws.clear_time,
         case
-            when rs.floor is null or rs.floor = 0 then null
-            else (rs.clear_time::numeric / rs.floor::numeric)::numeric(18, 6)
+            when rws.floor is null or rws.floor = 0 then null
+            else (rws.clear_time::numeric / rws.floor::numeric)::numeric(18, 6)
         end as sec_floor,
-        rs.job,
+        rws.job,
         cm."group",
-        cm.type
-    from rank_src rs
+        cm.type,
+        dm.segment_label(rws.floor, rws.top90_cnt) as segment
+    from rank_with_seg rws
     left join dm.character_master cm
-        on cm.job = rs.job;
+        on cm.job = rws.job;
 
     with char_dates as (
         select distinct unnest(p_character_dates)::date as dt
@@ -834,7 +845,10 @@ begin
             hs.획득_경험치_level,
             row_number() over (
                 partition by hs.date::date, hs.ocid
-                order by coalesce(hs.remain_point, 2147483647), hs.preset_no
+                order by
+                    coalesce(hs.보스_몬스터_공격_시_데미지_증가_level, 0) desc,
+                    coalesce(hs.remain_point, 2147483647),
+                    hs.preset_no
             ) as rn
         from dw.dw_hyperstat hs
         join char_dates cd
@@ -844,6 +858,15 @@ begin
         select *
         from hyper_pick_raw
         where rn = 1
+    ),
+    equipped_chars as (
+        select distinct
+            e.date::date as dt,
+            e.ocid
+        from dw.dw_equipment e
+        join char_dates cd
+            on cd.dt = e.date::date
+        where e.equipment_list = 'item_equipment'
     )
     insert into dm.dm_hyper (
         version,
@@ -891,7 +914,10 @@ begin
         coalesce(hp.크리티컬_확률_level, 0) as 크확,
         coalesce(hp.획득_경험치_level, 0) as 경험치
     from segged s
-    left join hyper_pick hp
+    join equipped_chars ec
+        on ec.dt = s.dt
+        and ec.ocid = s.ocid
+    join hyper_pick hp
         on hp.dt = s.dt
         and hp.ocid = s.ocid
     where s.segment is not null;
@@ -1130,6 +1156,9 @@ begin
         where s.segment is not null
           and se.set_name is not null
           and btrim(se.set_name) <> ''
+          and se.set_name not like '쁘띠%'
+          and se.set_name <> '__MISSING__'
+          and coalesce(mx.max_set_count, se.total_set_count, 1) > 1
     ),
     all_equipment_raw as (
         select dt, job, type, name, segment

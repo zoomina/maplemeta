@@ -240,3 +240,16 @@ create table if not exists dw.collect_api_retry_queue (
 
 create index if not exists idx_collect_api_retry_queue_status_next_retry_at
 on dw.collect_api_retry_queue (status, next_retry_at);
+
+create table if not exists dw.dw_update (
+    notice_id integer primary key,
+    title text,
+    url text,
+    date timestamptz,
+    version text,
+    content text,
+    detail_path text,
+    mahalil_path text
+);
+
+create index if not exists idx_dw_update_version on dw.dw_update (version);
