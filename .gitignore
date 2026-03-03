@@ -39,3 +39,4 @@ Thumbs.db
 *.log
 *.tmp
 log_*.txt
+.env

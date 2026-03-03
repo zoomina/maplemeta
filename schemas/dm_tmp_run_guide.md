@@ -1,9 +1,4 @@
-# DM 12409/12410 백필 실행 가이드
-
-## 상태
-- 현재 단계는 마트 스키마 확정 전 테스트 단계입니다.
-- 실험/구조 변경은 `schemas/dm_tmp.sql` 계열 파일에서 진행합니다.
-- `schemas/dm.sql` 계열은 최종 확정 시 신규 생성본으로 정리할 예정입니다.
+# DM TMP 12409/12410 실행 가이드
 
 ## 변경 로그
 
@@ -43,12 +38,14 @@
   - 집계 3개 테이블: `version + p_agg_dates` 단위 삭제 후 재적재
 
 ## 파일 구성
-- `schemas/dm.sql`
-  - 정의서 기준 DM 스키마 + 적재 함수 `dm.refresh_dashboard_dm(...)`
-- `schemas/dm_run_backfill.sql`
-  - 날짜별 버전 분리(12409/12410) 백필 실행 SQL
-- `schemas/dm_run_dag.sql`
-  - 동일 함수 호출 템플릿(운영 플로우 분리 전 참고용)
+- `schemas/dm_tmp.sql`
+  - 테스트/실험 단계용 DM 스키마 + 적재 함수 `dm.refresh_dashboard_dm(...)`
+  - dm_rank segment, dm_shift_score, dm_balance_score DDL 포함
+- `schemas/score_tmp.sql`
+  - dm_balance_score, dm_shift_score ETL 함수 (`dm.refresh_shift_balance_score`)
+- `scripts/backfill_dw_to_dm.py`
+  - 전체 백필: DW 완료 날짜 조회 → version별 refresh_dashboard_dm + refresh_shift_balance_score
+  - `--shift-score-only`: shift_score만 전체 백필
 
 ## 대상 매핑
 - `dw_rank -> dm.dm_rank`
@@ -59,6 +56,7 @@
 - `dw_ability -> dm.dm_ability`
 - `dw_equipment -> dm.dm_seedring`
 - `dw_equipment -> dm.dm_equipment`
+- `dw_hexacore -> dm.dm_hexacore` (version, date, job, segment별 집계)
 
 ## 고정 실행 파라미터
 - 버전 매핑:
@@ -68,8 +66,9 @@
 - aggregate 날짜: 각 버전별 동일한 2주
 
 ## 실행 순서
-1. `schemas/dm.sql` 실행
-2. `schemas/dm_run_backfill.sql` 실행
+1. `schemas/dm_tmp.sql` 실행
+2. `schemas/score_tmp.sql` 실행 (스키마/함수)
+3. `scripts/backfill_dw_to_dm.py` 실행 (refresh_dashboard_dm + refresh_shift_balance_score)
 
 ## 주요 규칙
 - idempotent: 대상 `version/date`를 삭제 후 재적재
@@ -116,6 +115,10 @@ where version in ('12409', '12410')
 union all
 select 'dm_equipment', count(*)
 from dm.dm_equipment
+where version in ('12409', '12410')
+union all
+select 'dm_hexacore', count(*)
+from dm.dm_hexacore
 where version in ('12409', '12410')
 union all
 select 'hyper_master', count(*)

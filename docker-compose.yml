@@ -1,6 +1,9 @@
 x-airflow-common:
   &airflow-common
-  image: apache/airflow:2.8.0
+  build:
+    context: .
+    dockerfile: Dockerfile.airflow
+  image: maplemeta-airflow:2.8.0
   environment:
     &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
@@ -14,6 +17,9 @@ x-airflow-common:
     API_KEY: ${API_KEY:-}
     API_KEY_1: ${API_KEY_1:-}
     API_KEY_2: ${API_KEY_2:-}
+    NEXON_API_KEY: ${NEXON_API_KEY:-${API_KEY_2:-}}
+    ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    STATIC_UPDATE_DIR: /opt/airflow/static/update
     DW_DATABASE_URL: ${DW_DATABASE_URL:-postgresql://airflow:airflow@postgres:5432/airflow}
   env_file:
     - ./.env
@@ -25,6 +31,8 @@ x-airflow-common:
     - ./logs:/opt/airflow/logs
     - ./plugins:/opt/airflow/plugins
     - ./schemas:/opt/airflow/schemas
+    # 서버: STATIC_HOST_DIR=/home/jamin/static (.env) → ~/static/update에 생성
+    - ${STATIC_HOST_DIR:-./static}:/opt/airflow/static
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
     &airflow-common-depends-on
