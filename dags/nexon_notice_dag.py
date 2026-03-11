@@ -21,6 +21,7 @@ for path in (os.path.join(BASE_DIR, "scripts"), BASE_DIR):
     if path not in sys.path:
         sys.path.insert(0, path)
 
+from sync_supabase import run_sync as _run_supabase_sync
 from backfill_nexon_notice import (
     _run_step_load,
     _run_step_dm_direct,
@@ -106,4 +107,10 @@ version_master_task = PythonOperator(
     dag=dag,
 )
 
-load_task >> dm_direct_task >> check_has_updates_task >> detail_task >> mahalil_task >> dw_update_task >> llm_task >> dm_task >> version_master_task
+supabase_sync_task = PythonOperator(
+    task_id="supabase_sync",
+    python_callable=_run_supabase_sync,
+    dag=dag,
+)
+
+load_task >> dm_direct_task >> check_has_updates_task >> detail_task >> mahalil_task >> dw_update_task >> llm_task >> dm_task >> version_master_task >> supabase_sync_task

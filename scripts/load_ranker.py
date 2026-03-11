@@ -11,49 +11,51 @@ from dw_load_utils import ensure_dw_schema, get_dw_connection, parse_rank_record
 
 def get_dojang_ranking_all_pages(date, world_name, api_key=None):
     """
-    특정 서버의 도장 랭킹을 1~5페이지까지 조회하여 통합
+    특정 서버의 도장 랭킹을 데이터가 없을 때까지 전체 페이지 조회하여 통합
     """
     if api_key is None:
-        api_key = resolve_api_key("API_KEY_2")
-    
+        api_key = resolve_api_key("API_KEY")
+
     headers = {
         "x-nxopen-api-key": api_key
     }
-    
+
     all_rankings = []
-    
-    for page in range(1, 6):  # 1~5페이지
+    page = 1
+
+    while True:
         print(f"[{world_name}] 페이지 {page} 조회 중...")
-        
+
         # 한글 서버명을 URL 인코딩
         world_encoded = world_name.encode('utf-8').hex()
         world_encoded = '%' + '%'.join([world_encoded[i:i+2] for i in range(0, len(world_encoded), 2)])
-        
+
         dojang_url = f"https://open.api.nexon.com/maplestory/v1/ranking/dojang?date={date}&world_name={world_encoded}&difficulty=1&page={page}"
-        
+
         try:
             response = requests.get(dojang_url, headers=headers)
-            
+
             if response.status_code == 200:
                 json_data = response.json()
-                
+
                 if 'ranking' in json_data and json_data['ranking']:
                     all_rankings.extend(json_data['ranking'])
                     print(f"[{world_name}] 페이지 {page}: {len(json_data['ranking'])}명 조회 완료")
+                    page += 1
                 else:
                     print(f"[{world_name}] 페이지 {page}: 데이터 없음")
                     break
             else:
                 print(f"[{world_name}] 페이지 {page} 조회 실패: Status {response.status_code}")
                 break
-                
+
         except Exception as e:
             print(f"[{world_name}] 페이지 {page} 조회 오류: {e}")
             break
-        
+
         # API 호출 제한 방지
         time.sleep(0.3)
-    
+
     return all_rankings
 
 def get_multi_world_ranking(date, worlds=['루나', '스카니아'], api_key=None):

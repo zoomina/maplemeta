@@ -28,6 +28,20 @@ DM_VERSION_RANGES_FALLBACK = [
     ("12412", date(2026, 2, 12), None),  # 2026-02-12 ~ 현재 (end_date null = open-ended)
 ]
 
+DM_TABLES_TO_TRUNCATE = (
+    "dm.dm_rank",
+    "dm.dm_force",
+    "dm.dm_hyper",
+    "dm.dm_ability",
+    "dm.dm_seedring",
+    "dm.dm_equipment",
+    "dm.dm_hexacore",
+    "dm.hyper_master",
+    "dm.dm_shift_score",
+    "dm.dm_balance_score",
+    "dm.equipment_master",
+)
+
 
 def _check_character_info_complete(conn, target_date: date) -> bool:
     """maplemeta_dag.check_data_exists('character_info')와 동일 로직."""
@@ -67,6 +81,42 @@ def get_dw_completed_dates(conn) -> list[date]:
 
     completed = [d for d in candidates if _check_character_info_complete(conn, d)]
     return completed
+
+
+def get_dw_all_dates(conn) -> list[date]:
+    """DW에 있는 모든 날짜 조회 (완료 체크 없음). dw_rank 우선, 비어있으면 5개 character_info 테이블 union."""
+    ensure_dw_schema(conn)
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            select distinct date::date as dt
+            from dw.dw_rank
+            order by dt
+            """
+        )
+        dates = [row[0] for row in cur.fetchall() if row and row[0]]
+
+    if not dates:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                select distinct dt from (
+                    select date::date as dt from dw.dw_equipment
+                    union
+                    select date::date from dw.dw_hexacore
+                    union
+                    select date::date from dw.dw_seteffect
+                    union
+                    select date::date from dw.dw_ability
+                    union
+                    select date::date from dw.dw_hyperstat
+                ) t
+                order by dt
+                """
+            )
+            dates = [row[0] for row in cur.fetchall() if row and row[0]]
+
+    return dates
 
 
 def get_latest_completed_date(conn) -> Optional[date]:
@@ -146,16 +196,42 @@ def run_refresh_shift_balance_score(conn, version: str) -> None:
     conn.commit()
 
 
-def run_full_backfill() -> None:
-    """전체 백필: DW 완료 날짜 조회 → version별 refresh_dashboard_dm 호출."""
+def truncate_dm_tables(conn) -> None:
+    """DW 기반 DM 테이블 전체 truncate (full-reset용)."""
+    with conn.cursor() as cur:
+        for table in DM_TABLES_TO_TRUNCATE:
+            cur.execute(f"truncate table {table} cascade")
+    conn.commit()
+
+
+def run_full_reset() -> None:
+    """DM 테이블 전체 truncate 후 DW 기준으로 재적재 (DW 클렌징 후 사용)."""
     conn = get_dw_connection()
     try:
-        completed = get_dw_completed_dates(conn)
-        if not completed:
-            print("DW에 character_info 완료된 날짜가 없습니다.")
-            return
+        print("DM 테이블 truncate 중...")
+        truncate_dm_tables(conn)
+        print("truncate 완료. DW → DM 전체 백필 시작 (force 모드)")
+        run_full_backfill(force=True)
+    finally:
+        conn.close()
 
-        print(f"DW 완료 날짜 {len(completed)}개: {[str(d) for d in completed]}")
+
+def run_full_backfill(force: bool = False) -> None:
+    """전체 백필: DW 날짜 조회 → version별 refresh_dashboard_dm 호출."""
+    conn = get_dw_connection()
+    try:
+        if force:
+            completed = get_dw_all_dates(conn)
+            if not completed:
+                print("DW에 날짜가 없습니다.")
+                return
+            print(f"DW 날짜 {len(completed)}개 (force 모드, 완료 체크 생략): {[str(d) for d in completed]}")
+        else:
+            completed = get_dw_completed_dates(conn)
+            if not completed:
+                print("DW에 character_info 완료된 날짜가 없습니다.")
+                return
+            print(f"DW 완료 날짜 {len(completed)}개: {[str(d) for d in completed]}")
 
         # version별로 그룹화
         version_to_dates: dict[str, list[date]] = {}
@@ -231,8 +307,22 @@ if __name__ == "__main__":
         action="store_true",
         help="shift_score만 전체 백필 (dm.dm_rank 기준 version)",
     )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="완료 체크 없이 DW에 있는 모든 날짜를 DM으로 적재 (하위권 등 5테이블 OCID 수 불일치 시 사용)",
+    )
+    parser.add_argument(
+        "--full-reset",
+        action="store_true",
+        help="DM 테이블 전체 truncate 후 DW 기준으로 재적재 (DW 클렌징 후 사용)",
+    )
     args = parser.parse_args()
     if args.shift_score_only:
         run_shift_score_backfill()
+    elif args.full_reset:
+        run_full_reset()
+    elif args.force:
+        run_full_backfill(force=True)
     else:
         run_full_backfill()

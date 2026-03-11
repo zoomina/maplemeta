@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-캐릭터 정보 수집 DAG (API_KEY_1 전용)
+캐릭터 정보 수집 DAG (API_KEY 전용)
 - 매주 목요일 8시 KST 실행
 - load_ranker -> collect_ocid -> load_ocid -> collect_character_info -> load_character_info
 """
@@ -25,14 +25,14 @@ from maplemeta_dag import (
     load_ranker_task_func,
 )
 
-# maplemeta_dag 함수들이 api_key_name으로 task_id를 생성 (load_ranker_api_key_1 등).
+# maplemeta_dag 함수들이 api_key_name으로 task_id를 생성 (load_ranker_api_key 등).
 # 우리 DAG는 task_id를 load_ranker 등으로 사용하므로, xcom_pull 시 매핑 필요.
 TASK_ID_MAP = {
-    "load_ranker_api_key_1": "load_ranker",
-    "collect_ocid_api_key_1": "collect_ocid",
-    "load_ocid_api_key_1": "load_ocid",
-    "collect_character_info_api_key_1": "collect_character_info",
-    "load_character_info_api_key_1": "load_character_info",
+    "load_ranker_api_key": "load_ranker",
+    "collect_ocid_api_key": "collect_ocid",
+    "load_ocid_api_key": "load_ocid",
+    "collect_character_info_api_key": "collect_character_info",
+    "load_character_info_api_key": "load_character_info",
 }
 
 
@@ -71,7 +71,7 @@ default_args = {
 dag = DAG(
     "load_character_info",
     default_args=default_args,
-    description="캐릭터 정보 수집 DAG (API_KEY_1 전용, 매주 목요일 8시)",
+    description="캐릭터 정보 수집 DAG (API_KEY 전용, 매주 목요일 8시)",
     schedule_interval="0 8 * * 4",
     start_date=datetime(2025, 1, 1),
     catchup=False,
@@ -81,31 +81,31 @@ dag = DAG(
 load_ranker = PythonOperator(
     task_id="load_ranker",
     python_callable=load_ranker_task_func,
-    op_kwargs={"api_key_name": "API_KEY_1"},
+    op_kwargs={"api_key_name": "API_KEY"},
     dag=dag,
 )
 
 collect_ocid = PythonOperator(
     task_id="collect_ocid",
-    python_callable=lambda **ctx: _with_mapped_context("API_KEY_1", load_ocid_task_func, **ctx),
+    python_callable=lambda **ctx: _with_mapped_context("API_KEY", load_ocid_task_func, **ctx),
     dag=dag,
 )
 
 load_ocid = PythonOperator(
     task_id="load_ocid",
-    python_callable=lambda **ctx: _with_mapped_context("API_KEY_1", load_ocid_to_dw_task_func, **ctx),
+    python_callable=lambda **ctx: _with_mapped_context("API_KEY", load_ocid_to_dw_task_func, **ctx),
     dag=dag,
 )
 
 collect_character_info = PythonOperator(
     task_id="collect_character_info",
-    python_callable=lambda **ctx: _with_mapped_context("API_KEY_1", collect_character_info_task_func, **ctx),
+    python_callable=lambda **ctx: _with_mapped_context("API_KEY", collect_character_info_task_func, **ctx),
     dag=dag,
 )
 
 load_character_info = PythonOperator(
     task_id="load_character_info",
-    python_callable=lambda **ctx: _with_mapped_context("API_KEY_1", load_character_info_task_func, **ctx),
+    python_callable=lambda **ctx: _with_mapped_context("API_KEY", load_character_info_task_func, **ctx),
     dag=dag,
 )
 

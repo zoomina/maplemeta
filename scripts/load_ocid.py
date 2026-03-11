@@ -18,7 +18,11 @@ from dw_load_utils import (
     upsert_stage_user_ocid,
 )
 
-PAYLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data_json", "_airflow_payloads")
+def _default_payload_dir():
+    return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data_json", "_airflow_payloads")
+
+
+PAYLOAD_DIR = os.getenv("AIRFLOW_PAYLOAD_DIR") or os.getenv("PAYLOAD_DIR") or _default_payload_dir()
 
 API_ERROR_CATALOG = {
     "OPENAPI00001": {"http_status": 500, "response_name": "Internal Server Error", "description": "Internal server error"},
@@ -65,7 +69,7 @@ def get_character_ocid(character_name, api_key=None):
     캐릭터 이름으로 OCID 조회
     """
     if api_key is None:
-        api_key = resolve_api_key("API_KEY_2")
+        api_key = resolve_api_key("API_KEY")
     
     headers = {
         "x-nxopen-api-key": api_key
@@ -231,9 +235,8 @@ def collect_user_ocid_data(date=None, api_key=None):
             return None
         print(f"랭킹 데이터 로드 완료(DB): 총 {len(ranking_data)}명")
 
-        top_jobs = analyze_job_distribution(ranking_data)
-        selected_players = get_top_players_by_job(ranking_data, top_jobs, 30, failed_set)
-        print(f"\n총 {len(selected_players)}명의 플레이어 선별 완료")
+        selected_players = [p for p in ranking_data if (p.get("캐릭터명") or "").strip() not in failed_set]
+        print(f"실패 마스터 제외 후 수집 대상: {len(selected_players)}명")
 
         user_ocid_list = []
         failed_list = []
@@ -241,116 +244,62 @@ def collect_user_ocid_data(date=None, api_key=None):
         consecutive_errors = 0
         max_consecutive_errors = 5
 
-        for job in top_jobs:
-            print(f"\n=== {job} 직업군 처리 시작 ===")
-            job_players = [
-                p for p in selected_players
-                if (p.get('세부직업', '').strip() or p.get('직업군', '').strip()) == job
-            ]
+        for idx, player in enumerate(selected_players):
+            character_name = (player.get("캐릭터명") or "").strip()
+            if not character_name:
+                continue
+            if (idx + 1) % 100 == 0 or idx == 0:
+                print(f"처리 중... ({idx+1}/{len(selected_players)})")
+            ocid, api_error = get_character_ocid(character_name, api_key)
 
-            job_success_count = 0
-            job_failed_chars = []
-
-            for idx, player in enumerate(job_players):
-                character_name = player['캐릭터명']
-                sub_job = player.get('세부직업', player.get('직업군', ''))
-
-                print(f"처리 중... ({idx+1}/{len(job_players)}) {character_name} ({sub_job})")
-                ocid, api_error = get_character_ocid(character_name, api_key)
-
-                if ocid:
-                    sub_job = get_job_name(player)
-                    user_ocid_list.append(
-                        {
-                            'character_name': character_name,
-                            'ocid': ocid,
-                            'sub_job': sub_job,
-                            'world': player['월드'],
-                            'level': player.get('레벨'),
-                            'dojang_floor': player['도장층수'],
-                        }
-                    )
-                    job_success_count += 1
-                    consecutive_errors = 0
-                else:
-                    print(f"OCID 조회 실패: {character_name}")
-                    job_failed_chars.append(character_name)
-                    failed_list.append({'index': idx, 'character_name': character_name, 'data': player})
-                    retry_items.append(
-                        {
-                            "endpoint": "ocid_lookup",
-                            "target_date": date,
-                            "ocid": f"CHAR:{character_name}",
-                            "character_name": character_name,
-                            "http_status": api_error.get("http_status") if api_error else None,
-                            "error_code": api_error.get("error_code") if api_error else None,
-                            "error_name": api_error.get("error_name") if api_error else None,
-                            "error_message": api_error.get("error_message") if api_error else "unknown_error",
-                            "api_response_body": api_error.get("api_response_body") if api_error else None,
-                        }
-                    )
-                    consecutive_errors += 1
-                    if consecutive_errors >= max_consecutive_errors:
-                        print(f"\n연속 {max_consecutive_errors}건 에러 발생. 조회를 중단합니다.")
-                        break
-
-                time.sleep(0.3)
-
-            if job_success_count < 30:
-                needed = 30 - job_success_count
-                print(f"\n{job}: {job_success_count}명만 성공, {needed}명 추가 필요")
-                current_failed_set = failed_set | set(job_failed_chars)
-                additional_players = fill_missing_players(
-                    ranking_data, [job], {job: job_success_count}, current_failed_set, 30
+            if ocid:
+                sub_job = get_job_name(player)
+                user_ocid_list.append(
+                    {
+                        "character_name": character_name,
+                        "ocid": ocid,
+                        "sub_job": sub_job,
+                        "world": player.get("월드"),
+                        "level": player.get("레벨"),
+                        "dojang_floor": player.get("도장층수"),
+                    }
                 )
+                consecutive_errors = 0
+            else:
+                print(f"OCID 조회 실패: {character_name}")
+                failed_list.append({"character_name": character_name, "data": player})
+                retry_items.append(
+                    {
+                        "endpoint": "ocid_lookup",
+                        "target_date": date,
+                        "ocid": f"CHAR:{character_name}",
+                        "character_name": character_name,
+                        "http_status": api_error.get("http_status") if api_error else None,
+                        "error_code": api_error.get("error_code") if api_error else None,
+                        "error_name": api_error.get("error_name") if api_error else None,
+                        "error_message": api_error.get("error_message") if api_error else "unknown_error",
+                        "api_response_body": api_error.get("api_response_body") if api_error else None,
+                    }
+                )
+                consecutive_errors += 1
+                if consecutive_errors >= max_consecutive_errors:
+                    print(f"\n연속 {max_consecutive_errors}건 에러 발생. 조회를 중단합니다.")
+                    break
 
-                for player in additional_players:
-                    character_name = player['캐릭터명']
-                    print(f"추가 조회: {character_name}")
-                    ocid, api_error = get_character_ocid(character_name, api_key)
-                    if ocid:
-                        sub_job = get_job_name(player)
-                        user_ocid_list.append(
-                            {
-                                'character_name': character_name,
-                                'ocid': ocid,
-                                'sub_job': sub_job,
-                                'world': player['월드'],
-                                'level': player.get('레벨'),
-                                'dojang_floor': player['도장층수'],
-                            }
-                        )
-                        job_success_count += 1
-                    else:
-                        job_failed_chars.append(character_name)
-                        failed_list.append({'character_name': character_name, 'data': player})
-                        retry_items.append(
-                            {
-                                "endpoint": "ocid_lookup",
-                                "target_date": date,
-                                "ocid": f"CHAR:{character_name}",
-                                "character_name": character_name,
-                                "http_status": api_error.get("http_status") if api_error else None,
-                                "error_code": api_error.get("error_code") if api_error else None,
-                                "error_name": api_error.get("error_name") if api_error else None,
-                                "error_message": api_error.get("error_message") if api_error else "unknown_error",
-                                "api_response_body": api_error.get("api_response_body") if api_error else None,
-                            }
-                        )
-                    time.sleep(0.3)
-
-                print(f"{job}: 최종 {job_success_count}명 수집 완료")
+            time.sleep(0.3)
 
         job_summary = {}
         for user in user_ocid_list:
-            job = user['sub_job']
+            job = user.get("sub_job") or ""
             job_summary[job] = job_summary.get(job, 0) + 1
 
-        print("\n=== 직업별 수집 현황 ===")
-        for job, count in job_summary.items():
-            print(f"{job}: {count}명")
+        print(f"\n수집 완료: 성공 {len(user_ocid_list)}명, 실패 {len(failed_list)}명")
+        if job_summary:
+            print("=== 직업별 수집 현황 ===")
+            for job, count in sorted(job_summary.items(), key=lambda x: -x[1])[:15]:
+                print(f"  {job}: {count}명")
 
-        failed_chars = sorted({item['character_name'] for item in failed_list})
+        failed_chars = sorted({item["character_name"] for item in failed_list})
         return {
             "date": date,
             "user_ocid_list": user_ocid_list,
@@ -415,6 +364,7 @@ def create_user_ocid_table(date=None, api_key=None):
     """
     payload = collect_user_ocid_data(date=date, api_key=api_key)
     return load_user_ocid_payload(payload, retry_delay_hours=3)
+
 
 if __name__ == "__main__":
     create_user_ocid_table()

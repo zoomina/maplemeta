@@ -29,7 +29,21 @@ def get_dw_connection():
 
     url = _get_env("DW_DATABASE_URL") or _get_env("DATABASE_URL")
     if url:
-        return psycopg2.connect(url, options=options)
+        try:
+            return psycopg2.connect(url, options=options)
+        except psycopg2.OperationalError as e:
+            err_text = str(e)
+            if ("postgres" in err_text and ("could not translate host name" in err_text or "Name or service not known" in err_text)):
+                from urllib.parse import urlparse, urlunparse
+                parsed = urlparse(url)
+                if parsed.hostname == "postgres":
+                    localhost_netloc = "localhost" if not parsed.port else "localhost:{}".format(parsed.port)
+                    if parsed.username:
+                        auth = parsed.username if not parsed.password else "{}:{}".format(parsed.username, parsed.password)
+                        localhost_netloc = "{}@{}".format(auth, localhost_netloc)
+                    fallback_url = urlunparse((parsed.scheme, localhost_netloc, parsed.path, parsed.params, parsed.query, parsed.fragment))
+                    return psycopg2.connect(fallback_url, options=options)
+            raise
 
     host = _get_env("DW_PGHOST") or _get_env("PGHOST")
     port = _get_env("DW_PGPORT") or _get_env("PGPORT")
