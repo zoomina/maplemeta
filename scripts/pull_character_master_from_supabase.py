@@ -24,11 +24,15 @@ import requests
 
 from dw_load_utils import get_dw_connection
 
-SUPABASE_URL = os.getenv("SUPABASE_URL", "https://okjrtyiucbywjhqgvxsd.supabase.co")
+SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = (
     os.getenv("SUPABASE_SERVICE_KEY")
     or os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 )
+if not SUPABASE_URL or not SUPABASE_KEY:
+    raise RuntimeError(
+        "SUPABASE_URL and SUPABASE_SERVICE_KEY (or SUPABASE_SERVICE_ROLE_KEY) 환경 변수 필요"
+    )
 _REST_HEADERS = {
     "apikey": SUPABASE_KEY,
     "Authorization": "Bearer {}".format(SUPABASE_KEY),
