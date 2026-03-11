@@ -24,7 +24,11 @@ from dw_load_utils import (
     upsert_seteffect,
 )
 
-PAYLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data_json", "_airflow_payloads")
+def _default_payload_dir():
+    return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data_json", "_airflow_payloads")
+
+
+PAYLOAD_DIR = os.getenv("AIRFLOW_PAYLOAD_DIR") or os.getenv("PAYLOAD_DIR") or _default_payload_dir()
 API_ERROR_CATALOG = {
     "OPENAPI00001": {"http_status": 500, "response_name": "Internal Server Error", "description": "Internal server error"},
     "OPENAPI00002": {"http_status": 403, "response_name": "Forbidden", "description": "Unauthorized access"},
@@ -71,7 +75,7 @@ def get_character_data(ocid, date, endpoint, api_key=None):
     특정 엔드포인트로 캐릭터 데이터 조회
     """
     if api_key is None:
-        api_key = resolve_api_key("API_KEY_2")
+        api_key = resolve_api_key("API_KEY")
     
     headers = {
         "x-nxopen-api-key": api_key

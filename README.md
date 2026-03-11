@@ -15,8 +15,8 @@
 ```
 maplemeta/
 ├── dags/                    # Airflow DAG 정의
-│   ├── maplemeta_dag.py      # 레거시: 매일 8시, API_KEY_1+2 순차
-│   ├── load_character_info_dag.py  # 매주 목요일 8시, API_KEY_1 전용
+│   ├── maplemeta_dag.py      # 매일 8시, API_KEY 단일 사이클
+│   ├── load_character_info_dag.py  # 매주 목요일 8시, API_KEY 전용
 │   ├── dw_dm_load_dag.py     # DW→DM 적재 (load_character_info 완료 10분 후)
 │   └── nexon_notice_dag.py   # Nexon 공지/업데이트/이벤트/캐시샵
 ├── schemas/                  # DB 스키마 및 ETL 함수
@@ -29,6 +29,7 @@ maplemeta/
 │   ├── load_ocid.py          # OCID 수집·적재
 │   ├── load_character_info.py # 캐릭터 정보 수집·적재
 │   ├── backfill_dw_to_dm.py  # DW→DM 전체 백필
+│   ├── backfill_rank_missing_character_info.py  # DW만: version_master 범위 내 비어 있는 인원 OCID·character_info 백필
 │   ├── backfill_nexon_notice.py # Nexon 공지 백필
 │   └── dw_load_utils.py      # DW 연결·스키마 유틸
 ├── config.py                 # 환경 변수 (API_KEY 등)
@@ -49,11 +50,12 @@ cp .env.example .env
 
 | 변수 | 설명 |
 |------|------|
-| `API_KEY_1` | 목요일 수집용 Nexon API 키 |
-| `API_KEY_2` | 백필용 Nexon API 키 |
-| `NEXON_API_KEY` | Nexon 공지 API (없으면 API_KEY_2 사용) |
+| `API_KEY` | 메인 Nexon API 키 (수집·백필 공통) |
+| `API_KEY_1`, `API_KEY_2` | 레거시 (선택) |
+| `NEXON_API_KEY` | Nexon 공지 API (없으면 API_KEY 사용) |
 | `ANTHROPIC_API_KEY` | patch_note LLM 생성용 |
 | `DW_DATABASE_URL` | PostgreSQL 연결 문자열 |
+| `AIRFLOW_PAYLOAD_DIR` | Airflow에서 페이로드 저장 경로 (권한 오류 시 설정) |
 
 ### 2. Docker 실행
 
@@ -78,35 +80,57 @@ psql "$DW_DATABASE_URL" -v ON_ERROR_STOP=1 -f schemas/score_tmp.sql
 
 ```mermaid
 flowchart LR
-    subgraph legacy [maplemeta_data_collection - 레거시]
-        R1[load_ranker_1] --> O1 --> L1 --> C1 --> LC1
-        LC1 --> R2 --> O2 --> L2 --> C2 --> LC2
-    end
-    subgraph new [load_character_info - 매주 목요일]
+    subgraph maple [maplemeta_data_collection - 매일 8시]
         R[load_ranker] --> O[collect_ocid] --> L[load_ocid] --> C[collect_char] --> LC[load_char]
+    end
+    subgraph thursday [load_character_info - 매주 목요일 8시]
+        R2[load_ranker] --> O2[collect_ocid] --> L2[load_ocid] --> C2[collect_char] --> LC2[load_char]
     end
     subgraph dw_dm [dw_dm_load]
         SENSOR[wait_load_char] --> REFRESH[refresh_dm] --> SHIFT[refresh_shift_score]
     end
-    LC -.->|ExternalTaskSensor| SENSOR
+    LC2 -.->|ExternalTaskSensor| SENSOR
 ```
 
 | DAG | 스케줄 | 설명 |
 |-----|--------|------|
-| `maplemeta_data_collection` | 매일 8시 | API_KEY_1+2 순차 백필 (레거시) |
-| `load_character_info` | 매주 목요일 8시 | API_KEY_1 전용 수집 |
+| `maplemeta_data_collection` | 매일 8시 | API_KEY 단일 사이클 백필 |
+| `load_character_info` | 매주 목요일 8시 | API_KEY 전용 수집 |
 | `dw_dm_load` | 매주 목요일 8시 | load_character_info 완료 10분 후 DM refresh |
 | `nexon_notice_backfill` | 매일 9시 | 공지·업데이트·이벤트·캐시샵 |
 
 ## 백필
 
-```bash
-# DW→DM 전체 백필
-python scripts/backfill_dw_to_dm.py
+### DW만 (OCID·character_info)
 
-# shift_score만 백필
-python scripts/backfill_dw_to_dm.py --shift-score-only
+```bash
+# dm.version_master 범위 내, 비어 있는 인원만 수집·DW 적재 (DM refresh 없음)
+python3 scripts/backfill_rank_missing_character_info.py
+python3 scripts/backfill_rank_missing_character_info.py --dry-run   # 대상만 출력
 ```
+
+### DW → DM
+
+```bash
+# 기본: character_info 완료된 날짜만 적재 (5개 테이블 OCID 수 동일한 날짜)
+python3 scripts/backfill_dw_to_dm.py
+
+# --force: 완료 체크 생략, dw_rank에 있는 모든 날짜 적재 (하위권 등 OCID 수 불일치 시)
+python3 scripts/backfill_dw_to_dm.py --force
+
+# --full-reset: DM 테이블 전체 truncate 후 DW 기준으로 재적재 (DW 클렌징 후 사용)
+python3 scripts/backfill_dw_to_dm.py --full-reset
+
+# --shift-score-only: shift_score·balance_score만 백필 (dm.dm_rank 기준 version)
+python3 scripts/backfill_dw_to_dm.py --shift-score-only
+```
+
+| 옵션 | 설명 |
+|------|------|
+| (없음) | 5개 character_info 테이블 OCID 수가 동일한 날짜만 DM 적재 |
+| `--force` | 완료 체크 생략. dw_rank 날짜 전체 적재 (하위권·셋팅 미구성 캐릭터는 NULL) |
+| `--full-reset` | dm_rank, dm_force, dm_hyper 등 11개 테이블 truncate 후 `--force` 모드로 재적재 (character_master 제외) |
+| `--shift-score-only` | dm.dm_rank에 있는 version에 대해 shift_score·balance_score만 재계산 |
 
 ## 세그먼트 정의
 
@@ -121,6 +145,13 @@ python scripts/backfill_dw_to_dm.py --shift-score-only
 ## 변경 히스토리
 
 > 파일 생성일·커밋 기준. 내용의 날짜(예: 12409, 12/10)는 데이터/버전 기준일.
+
+### 2026-03-06
+- **API_KEY 전환**: 메인 키를 `API_KEY`로 통일, `API_KEY_1`/`API_KEY_2`는 레거시로 유지
+- **DAG 단일 사이클**: maplemeta_dag·load_character_info_dag 모두 API_KEY 하나만 사용 (task_id: `load_ranker_api_key` 등)
+- **도장 랭크 전체 수집**: load_ranker는 1~5페이지 고정 제거, 빈 응답 나올 때까지 전체 페이지 조회; load_ocid는 150명 선별 제거, dw_rank 전체를 OCID·character_info 대상으로 사용
+- **백필 스크립트 추가**: `backfill_rank_missing_character_info.py` — dm.version_master 범위 내, dw_rank에 있으나 OCID/character_info가 비어 있는 인원만 수집·**DW 적재만** 수행 (DM refresh 없음)
+- **PAYLOAD_DIR 권한 대응**: `AIRFLOW_PAYLOAD_DIR`/`PAYLOAD_DIR` 환경 변수로 페이로드 경로 오버라이드 가능 (PermissionError 방지)
 
 ### 2026-03-03
 - **DAG 스케줄 재구성**: `load_character_info` 신규 생성 (매주 목요일 8시, API_KEY_1 전용)

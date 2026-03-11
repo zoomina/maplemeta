@@ -21,6 +21,7 @@ for path in (SCRIPTS_DIR, BASE_DIR):
 
 from backfill_dw_to_dm import run_incremental_for_latest, run_refresh_shift_balance_score
 from dw_load_utils import get_dw_connection
+from sync_supabase import run_sync_dm_tables
 
 default_args = {
     "owner": "maplemeta",
@@ -63,6 +64,13 @@ def _run_shift_score(**context):
         conn.close()
 
 
+def _run_supabase_sync(**context):
+    """DM 적재 완료 후 Supabase에 dm 테이블 싱크."""
+    ti = context["ti"]
+    version = ti.xcom_pull(task_ids="refresh_dm")
+    run_sync_dm_tables(version=version)
+
+
 wait_load_character_info = ExternalTaskSensor(
     task_id="wait_load_character_info_complete",
     external_dag_id="load_character_info",
@@ -83,4 +91,10 @@ refresh_shift_score = PythonOperator(
     dag=dag,
 )
 
-wait_load_character_info >> refresh_dm >> refresh_shift_score
+supabase_sync = PythonOperator(
+    task_id="supabase_sync",
+    python_callable=_run_supabase_sync,
+    dag=dag,
+)
+
+wait_load_character_info >> refresh_dm >> refresh_shift_score >> supabase_sync

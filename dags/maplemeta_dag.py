@@ -1,8 +1,8 @@
 """
 메이플스토리 데이터 수집 DAG
-- 매일: API_KEY_1과 API_KEY_2 둘 다 백필 실행 (2개 사이클)
+- 매일: API_KEY(live) 단일 사이클 백필 실행
 - 백필: 오늘 기준 과거 수요일 데이터를 최신부터 과거 순서로 수집
-순서: load_ranker -> load_ocid -> load_character_info (각 API_KEY별로)
+순서: load_ranker -> load_ocid -> load_character_info
 """
 import os
 import sys
@@ -384,79 +384,41 @@ def load_character_info_task_func(api_key_name, **context):
     return _run_with_backoff(f"{api_key_name}-character-load", _action)
 
 
-# API_KEY_1 작업 정의
-load_ranker_task_1 = PythonOperator(
-    task_id='load_ranker_api_key_1',
+# API_KEY (live) 단일 사이클 작업 정의
+load_ranker_task = PythonOperator(
+    task_id='load_ranker_api_key',
     python_callable=load_ranker_task_func,
-    op_kwargs={'api_key_name': 'API_KEY_1'},
+    op_kwargs={'api_key_name': 'API_KEY'},
     dag=dag,
 )
 
-collect_ocid_task_1 = PythonOperator(
-    task_id='collect_ocid_api_key_1',
+collect_ocid_task = PythonOperator(
+    task_id='collect_ocid_api_key',
     python_callable=load_ocid_task_func,
-    op_kwargs={'api_key_name': 'API_KEY_1'},
+    op_kwargs={'api_key_name': 'API_KEY'},
     dag=dag,
 )
 
-load_ocid_task_1 = PythonOperator(
-    task_id='load_ocid_api_key_1',
+load_ocid_task = PythonOperator(
+    task_id='load_ocid_api_key',
     python_callable=load_ocid_to_dw_task_func,
-    op_kwargs={'api_key_name': 'API_KEY_1'},
+    op_kwargs={'api_key_name': 'API_KEY'},
     dag=dag,
 )
 
-collect_character_info_task_1 = PythonOperator(
-    task_id='collect_character_info_api_key_1',
+collect_character_info_task = PythonOperator(
+    task_id='collect_character_info_api_key',
     python_callable=collect_character_info_task_func,
-    op_kwargs={'api_key_name': 'API_KEY_1'},
+    op_kwargs={'api_key_name': 'API_KEY'},
     dag=dag,
 )
 
-load_character_info_task_1 = PythonOperator(
-    task_id='load_character_info_api_key_1',
+load_character_info_task = PythonOperator(
+    task_id='load_character_info_api_key',
     python_callable=load_character_info_task_func,
-    op_kwargs={'api_key_name': 'API_KEY_1'},
-    dag=dag,
-)
-
-# API_KEY_2 작업 정의
-load_ranker_task_2 = PythonOperator(
-    task_id='load_ranker_api_key_2',
-    python_callable=load_ranker_task_func,
-    op_kwargs={'api_key_name': 'API_KEY_2'},
-    dag=dag,
-)
-
-collect_ocid_task_2 = PythonOperator(
-    task_id='collect_ocid_api_key_2',
-    python_callable=load_ocid_task_func,
-    op_kwargs={'api_key_name': 'API_KEY_2'},
-    dag=dag,
-)
-
-load_ocid_task_2 = PythonOperator(
-    task_id='load_ocid_api_key_2',
-    python_callable=load_ocid_to_dw_task_func,
-    op_kwargs={'api_key_name': 'API_KEY_2'},
-    dag=dag,
-)
-
-collect_character_info_task_2 = PythonOperator(
-    task_id='collect_character_info_api_key_2',
-    python_callable=collect_character_info_task_func,
-    op_kwargs={'api_key_name': 'API_KEY_2'},
-    dag=dag,
-)
-
-load_character_info_task_2 = PythonOperator(
-    task_id='load_character_info_api_key_2',
-    python_callable=load_character_info_task_func,
-    op_kwargs={'api_key_name': 'API_KEY_2'},
+    op_kwargs={'api_key_name': 'API_KEY'},
     dag=dag,
 )
 
 # 작업 의존성 설정
-# API_KEY_1 순차 실행 -> API_KEY_2 순차 실행
-load_ranker_task_1 >> collect_ocid_task_1 >> load_ocid_task_1 >> collect_character_info_task_1 >> load_character_info_task_1 >> \
-load_ranker_task_2 >> collect_ocid_task_2 >> load_ocid_task_2 >> collect_character_info_task_2 >> load_character_info_task_2
+load_ranker_task >> collect_ocid_task >> load_ocid_task >> collect_character_info_task >> load_character_info_task
