@@ -26,6 +26,7 @@ airflow.cfg
 *.swp
 *.swo
 *~
+.cursor/
 
 # OS
 .DS_Store

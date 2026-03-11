@@ -30,7 +30,7 @@ log = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
 # ── Supabase config ──────────────────────────────────────────────────────────
-SUPABASE_URL = os.getenv("SUPABASE_URL", "https://okjrtyiucbywjhqgvxsd.supabase.co")
+SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY") or os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 PATCH_NOTES_BUCKET = "patch-notes"
 STORAGE_BASE = f"{SUPABASE_URL}/storage/v1/object/public/{PATCH_NOTES_BUCKET}"
@@ -327,8 +327,10 @@ def run_sync_dm_tables(version: str | None = None, **kwargs) -> None:
     from dotenv import load_dotenv
     load_dotenv()
 
-    if not SUPABASE_KEY:
-        raise RuntimeError("SUPABASE_SERVICE_KEY 또는 SUPABASE_SERVICE_ROLE_KEY 환경 변수 필요")
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        raise RuntimeError(
+            "SUPABASE_URL and SUPABASE_SERVICE_KEY (or SUPABASE_SERVICE_ROLE_KEY) 환경 변수 필요"
+        )
 
     log.info("=== Supabase DM Tables Sync Start ===")
 
@@ -383,8 +385,10 @@ def run_sync(**kwargs):
     from dotenv import load_dotenv
     load_dotenv()
 
-    if not SUPABASE_KEY:
-        raise RuntimeError("SUPABASE_SERVICE_KEY 또는 SUPABASE_SERVICE_ROLE_KEY 환경 변수 필요")
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        raise RuntimeError(
+            "SUPABASE_URL and SUPABASE_SERVICE_KEY (or SUPABASE_SERVICE_ROLE_KEY) 환경 변수 필요"
+        )
 
     log.info("=== Supabase Sync Start ===")
 

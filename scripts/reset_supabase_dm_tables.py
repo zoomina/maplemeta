@@ -51,8 +51,12 @@ RESET_TABLES = [
 
 def _sb_delete_by_filter(table: str, params: dict) -> None:
     """PostgREST delete with filter."""
-    SUPABASE_URL = os.getenv("SUPABASE_URL", "https://okjrtyiucbywjhqgvxsd.supabase.co")
+    SUPABASE_URL = os.getenv("SUPABASE_URL")
     SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY") or os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        raise RuntimeError(
+            "SUPABASE_URL and SUPABASE_SERVICE_KEY (or SUPABASE_SERVICE_ROLE_KEY) 환경 변수 필요"
+        )
     headers = {
         "apikey": SUPABASE_KEY,
         "Authorization": f"Bearer {SUPABASE_KEY}",
