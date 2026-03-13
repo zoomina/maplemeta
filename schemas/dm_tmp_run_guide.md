@@ -2,6 +2,12 @@
 
 ## 변경 로그
 
+### 2026-03-12
+- **dm_balance_score**: segment 삭제, filter(전체/전사/궁수/마법사/도적/해적) 추가. 전체 모수(50층+상위권) 사용, 가중평균 제거.
+- **dm_shift_score**: segment(50층/상위권/전체), filter(전체~해적), job(개별+aggregate) 추가. 제논=도적+해적, 캐논슈터=캐논 마스터 통합.
+- **score_drop_reload.sql** 신규: drop+create+refresh (12405~12412). `python scripts/backfill_dw_to_dm.py --versions 12405,12406,...,12412` 대안.
+- **Supabase 마이그레이션**: `python scripts/supabase_score_migrate.py` (로컬 일괄 실행). 전제: .env에 SUPABASE_DB_URL 설정.
+
 ### 2026-02-25
 - 집계 기준 변경: `timing + rate` -> `date + count`
   - 대상: `dm.dm_ability`, `dm.dm_seedring`, `dm.dm_equipment`

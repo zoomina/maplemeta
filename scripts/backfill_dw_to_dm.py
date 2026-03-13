@@ -317,8 +317,26 @@ if __name__ == "__main__":
         action="store_true",
         help="DM 테이블 전체 truncate 후 DW 기준으로 재적재 (DW 클렌징 후 사용)",
     )
+    parser.add_argument(
+        "--versions",
+        type=str,
+        metavar="V1,V2,...",
+        help="지정 버전만 refresh_shift_balance_score 실행 (예: 12405,12406,12407)",
+    )
     args = parser.parse_args()
-    if args.shift_score_only:
+    if args.versions:
+        versions = [v.strip() for v in args.versions.split(",") if v.strip()]
+        if not versions:
+            print("--versions에 버전을 지정하세요")
+            sys.exit(1)
+        conn = get_dw_connection()
+        try:
+            for v in versions:
+                run_refresh_shift_balance_score(conn, v)
+                print(f"  {v} 완료")
+        finally:
+            conn.close()
+    elif args.shift_score_only:
         run_shift_score_backfill()
     elif args.full_reset:
         run_full_reset()

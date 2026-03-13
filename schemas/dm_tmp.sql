@@ -170,12 +170,15 @@ create table dm.dm_hexacore (
 
 create index if not exists idx_dm_hexacore_version_date on dm.dm_hexacore (version, date);
 
--- dm_shift_score: 직업×세그먼트×버전별 Total Shift 점수 (shift_score/엔트로피 계획)
--- 100점 척도: KPI 카드용 min-max 정규화
-create table if not exists dm.dm_shift_score (
+-- dm_shift_score: 직업×세그먼트×필터×버전별 Total Shift 점수
+-- segment: 50층, 상위권, 전체(50층+상위권 union). filter: 전체, 전사, 궁수, 마법사, 도적, 해적.
+-- job: 개별 직업명 또는 aggregate(전체~해적). 100점 척도: KPI 카드용 min-max 정규화.
+drop table if exists dm.dm_shift_score cascade;
+create table dm.dm_shift_score (
     version varchar(32) not null,
-    job varchar(64) not null,
     segment varchar(16) not null,
+    filter varchar(16) not null,
+    job varchar(64) not null,
     outcome_shift float,
     stat_shift float,
     build_shift float,
@@ -185,24 +188,22 @@ create table if not exists dm.dm_shift_score (
     stat_score_100 smallint,
     build_score_100 smallint,
     total_score_100 smallint,
-    primary key (version, job, segment)
+    primary key (version, segment, filter, job)
 );
-alter table dm.dm_shift_score add column if not exists outcome_score_100 smallint;
-alter table dm.dm_shift_score add column if not exists stat_score_100 smallint;
-alter table dm.dm_shift_score add column if not exists build_score_100 smallint;
-alter table dm.dm_shift_score add column if not exists total_score_100 smallint;
 
--- dm_balance_score: 버전×세그먼트별 밸런스 점수(정규화 엔트로피 기반)
-create table if not exists dm.dm_balance_score (
+-- dm_balance_score: 버전×필터별 밸런스 점수(정규화 엔트로피 기반)
+-- filter: 전체, 전사, 궁수, 마법사, 도적, 해적. segment 없음, 전체 모수 사용.
+drop table if exists dm.dm_balance_score cascade;
+create table dm.dm_balance_score (
     version varchar(32) not null,
-    segment varchar(16) not null,
+    filter varchar(16) not null,
     balance_score smallint not null,
     top_job varchar(64),
     top_share float,
     cr3 float,
     top_type varchar(32),
     top_type_share float,
-    primary key (version, segment)
+    primary key (version, filter)
 );
 
 create or replace function dm.split_label_value(p_text text)
